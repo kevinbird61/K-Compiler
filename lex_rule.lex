@@ -1,10 +1,16 @@
 %{
+/* Global variable */
 
 %}
-
 %%
-[if] {
-	printf("<if-else clause>\n");
+
+[ ]*else[ ]* {
+	printf("<if-else : else clause> : %s\n",yytext);
+}
+
+[ ]*if[ ]* {
+	/* compare with if */
+	printf("<if-else : if clause> : %s\n",yytext);
 }
 
 [ \t] ;
