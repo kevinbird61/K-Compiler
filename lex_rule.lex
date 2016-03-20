@@ -1,7 +1,12 @@
 %{
 
 %}
+
 %%
+[if] {
+	printf("<if-else clause>\n");
+}
+
 [ \t] ;
 [0-9]+\.[0-9]+ { 
 	printf("Float point\n");
