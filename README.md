@@ -1,5 +1,7 @@
 # K-Compiler
 Collocate with compiler tutorial
+## PreStart
+`sudo apt-get install flex` : to get lex
 
 ## How to build a compiler?
 ### Step 1
