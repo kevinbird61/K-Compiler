@@ -1,6 +1,11 @@
 # K-Compiler
 ## Author
  - Kevin Chiu , `kevinbird61@gmail.com`
+  - Welcome to fork this K-compiler , and revise its memory usage.
+  - If you're willing , I'll invite you to join K-compiler.
+
+## Now Support 
+ - You can see in the test file : `src/test.c`
 
 ## PreStart
  - `sudo apt-get install flex` : to get lex
