@@ -57,4 +57,7 @@ Testing the run_compile.s in MIPS.
     - Here , you can replace your file with test.c , to make your assembly code.
 
 # Some Supplement
-1. [Helpful markdown for git README.md](https://github.com/adam-p/markdown-here/wiki/Markdown-Cheatsheet)
+1. [Flex](http://flex.sourceforge.net/manual/)
+2. [Bison](http://www.gnu.org/software/bison/manual/bison.html)
+3. [MIPS Quick Tutorial](http://logos.cs.uic.edu/366/notes/mips%20quick%20tutorial.htm)
+4. [Helpful markdown for git README.md](https://github.com/adam-p/markdown-here/wiki/Markdown-Cheatsheet)
