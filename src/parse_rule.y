@@ -11,19 +11,33 @@
 /* function define */
 int yyerror(char *s) ;
 int yylex(void);
-int push_stack(int type , string ID , int size); // Allocation of variable , with return stack_header
+// push_stack : used for variable allocate , with return value - stack_header(denote as the currently usage of stack)
+int push_stack(int type , string ID , int size);
+// Search whether this ID has been used or not (usage in push_stack)
 int search_duplicate(string ID);
+// Judge the input Op1 and Op2 , which one has more power (Priority)
 int judgeOp(string OP1 , string OP2);
+// Dealing the expression with the priority case (the expr "()" in expr , which need to do first)
 string dealWithPriority(vector<string> List);
+// Get the variables location in the stack memory
 int whereVariable(string ID);
+// Dealing with the 2 Stack : Op stack and Data stack , to reach the expr 
 void dealing_Expr();
+// Translate the result of expr to MIPS
 void trans_code2MIPS(string OP,string Data1,string Data2,string current_register);
+// Do the If - else expr's translation
 void if_else_toMIPS(size_t if_stmt_loc , size_t else_stmt_loc , int if_stmt_size , int else_stmt_size ,string if_expr);
+// Do the while expr's translation
 void while_toMIPS(size_t while_stmt_loc , int while_stmt_size , string while_expr);
+// Doing the if's expr , and return the MIPS code in string , which the caller has this usage to concate in the final output
 string make_if_expr(string OP , string data1, string data2);
+// Doing the while's expr , and return the MIPS code in string , which the caller has this usage to concate in the final output
 string make_while_expr(string OP , string data1, string data2);
+// Make the int to string 
 string int2str(int &i);
+// Judge the raw string - ID's category
 int judge_category(string ID); // Return val : 0 -> pure number , 1 -> op , 2 -> var , 3 -> array , 4 -> function , -1 : not found
+// print out the vector's content for debugging 
 void debugVector(vector<string> stack);
 /* Output file */
 ofstream assemFile;
@@ -282,10 +296,6 @@ paramDecl_D: { $$.type = 0; /* parameter is an variable */}
 	;
 
 block: LEFT_BRACE varDeclList stmtList RIGHT_BRACE { 
-	//cout << "Complete the block" << endl;
-	//cout << "Variable Declaration : " << *$2 << endl;
-	//cout << "Statement : " << *$3 << endl;
-	//stack_header = stack_tailer;
 		*$$ = *$3;
 	}
 	;
@@ -356,8 +366,7 @@ stmtList_D: /* empty */ { $$ = new string("");}
 	} 
 	;
 	
-stmt: SEMICOLON { 
-		//cout << "End of assignment" << endl; 
+stmt: SEMICOLON {
 		*$$ = "";
 	}
 	| expr SEMICOLON { 
@@ -394,7 +403,6 @@ stmt: SEMICOLON {
 		/* Return expr */ 
 		// If It is a variable or a pure number , translate to assembly directly.
 		int judge = judge_category(*$2);
-		cout << "[Return]: " << *$2 << endl;
 		if(judge == 2){
 			// Variable
 			int index=-1;
@@ -710,7 +718,7 @@ void if_else_toMIPS(size_t if_stmt_loc , size_t else_stmt_loc , int if_stmt_size
 		// Has been tested , ok
 	}
 	else{
-		// TODO Extend condition
+		// TODO Extend condition ( with more than 2 expr on both side)
 	}
 	// Now we need to insert or condition into _temp (Consider the order and the index , we insert from back to former)
 	// Step 1 , insert Endif
@@ -793,10 +801,18 @@ string make_while_expr(string OP , string data1, string data2){
 		ss << "\tbgtz " << temp_j << ", EndWhile\n";	// If temp_j > 0  , jump to Else
 	}
 	else if(OP == "&&"){
-		// TODO
+		// Judge Lreg , if Lreg == 0 , then jump to endwhile
+		ss << "\tbeq " << Lreg << ", $zero , EndWhile\n";
+		// Judge Rreg , if Rreg == 0 , then jump to endwhile
+		ss << "\tbeq " << Rreg << ", $zero , EndWhile\n";
 	}
 	else if(OP == "||"){
-		// TODO
+		// Judge Lreg , if Lreg == 1 , then jump to the tag we add (on the end of this expr , which concat with the while-stmt)
+		ss << "\tbeq " << Lreg << ", 1 , goWHILE\n"; 
+		// Judge Rreg , mention that , if we run to this code , it means now Lreg = 0 , so when Rreg = 0 , it need to go to endwhile
+		ss << "\tbeq " << Rreg << ", 0 , EndWhile\n";
+		// At the end , we add the tag which the above statement can jump
+		ss << "goWHILE:\n";
 	}
 	else if(OP == "!="){
 		ss << "\tbne " << Lreg << ", " << Rreg << ", EndWhile\n";
@@ -890,10 +906,18 @@ string make_if_expr(string OP , string data1, string data2){
 		ss << "\tbgtz " << temp_j << ", Else\n";	// If temp_j > 0  , jump to Else
 	}
 	else if(OP == "&&"){
-		// TODO
+		// Judge Lreg , if Lreg == 0 , then jump to else
+		ss << "\tbeq " << Lreg << ", $zero , Else\n";
+		// Judge Rreg , if Rreg == 0 , then jump to else
+		ss << "\tbeq " << Rreg << ", $zero , Else\n";
 	}
 	else if(OP == "||"){
-		// TODO
+		// Judge Lreg , if Lreg == 1 , then jump to the tag we add (on the end of this expr , which concat with the if-stmt)
+		ss << "\tbeq " << Lreg << ", 1 , goIf\n"; 
+		// Judge Rreg , mention that , if we run to this code , it means now Lreg = 0 , so when Rreg = 0 , it need to go to endwhile
+		ss << "\tbeq " << Rreg << ", 0 , Else\n";
+		// At the end , we add the tag which the above statement can jump
+		ss << "goIf:\n";
 	}
 	else if(OP == "!="){
 		ss << "\tbne " << Lreg << ", " << Rreg << ", Else\n";
@@ -1438,7 +1462,7 @@ int push_stack(int type , string ID , int size){
 			Variable_List[stack_header] = ID;
 			ss << "\t#" << ID << " is in " << stack_header*4 <<"($sp)\n";
 			ss << "\taddi $sp , $sp , "<< -4*stack_header<<"\n";
-			ss << "\taddi $t0 , $t0 , 0\n";
+			ss << "\taddi $t0 , $zero , 0\n";
 			ss << "\tsw $t0 , 0($sp)\n";
 			ss << "\taddi $sp , $sp , "<< 4*stack_header << "\n";
 			_temp += ss.str(); ss.str("");
