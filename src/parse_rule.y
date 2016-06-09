@@ -141,8 +141,7 @@ Program: declList {
 		// Open File for assembly
 		assemFile.open("run_compile.s");
 		// At the end 
-		assemFile << "\t.data\n" << _data << "\t.text\n" << _text;
-		
+		assemFile << "\t.data\n" << _data << "\t.text\n\t.globl main\n" << _text;	
 		/*
 		for(int i = 0 ; i < stack_header; i++){
 			cout << Variable_List[i] << " ";
@@ -178,7 +177,7 @@ declList_D: type ID decl {
 			if($1==1)
 				if(*$2 == "idMain"){
 					cout << "Get Main function (Int): " << *$2 << endl; 
-					ss << "idMain:\n";
+					ss << "main:\n";
 					_text = _text + ss.str() + _temp;
 					ss.str("");
 					_temp = "";
@@ -187,14 +186,15 @@ declList_D: type ID decl {
 					cout << "Function: Get type with Int , And function name is " << *$2 << endl;
 					ss << *$2 <<":\n";
 					function_list.push_back(*$2);
-					_text = ss.str() + _temp+ "\tjr $ra\n"; // For return value and function name declaration
+					// Require a temp register to store 
+					_text = ss.str() + _temp+ "\tbeq $ra , $zero , main\n\tjr $ra\n"; // For return value and function name declaration
 					ss.str("");
 					_temp = "";
 				}
 			else // Char
 				if(*$2 == "idMain"){
 					cout << "Get Main function (Int): " << *$2 << endl; 
-					ss << "idMain:\n";
+					ss << "main:\n";
 					_text = _text+ss.str()+_temp;
 					ss.str("");
 				}
@@ -552,7 +552,6 @@ stmt: SEMICOLON {
 		}
 		// FIXME : print for char 
 		_temp += ss.str(); ss.str("");
-		t_reg_index--;
 		*$$ = "";	
 	}
 	;
@@ -1273,13 +1272,13 @@ void trans_code2MIPS(string OP,string Data1,string Data2 ,string current_registe
 				t_reg_index++;
 				int index = i*4;
 				// and now load it into temp register
-				ss << "\tlw "<< reg1<< ", " <<int2str(index)+"($sp)\n";
+				ss << "\tlw "<< reg1 << ", " <<int2str(index)+"($sp)\n";
 				t_usage++;
 				break;
 			}
 		}
 	}
-	else if(Data1 == "$v0" || Data1 == current_register){ // Because need to push the result back to keep calculate
+	else if(Data1 == "$v0" || Data1 == current_register || (Data1.find("$t") == 0) ){ // Because need to push the result back to keep calculate
 		reg1 = Data1;
 	}
 	else if(judge_category(Data1) == 5){
@@ -1312,7 +1311,7 @@ void trans_code2MIPS(string OP,string Data1,string Data2 ,string current_registe
 			}
 		}
 	}
-	else if(Data2 == "$v0" || Data2 == current_register){
+	else if(Data2 == "$v0" || Data2 == current_register || (Data2.find("$t") == 0)){
 		reg2 = Data2;
 	}
 	else if(judge_category(Data2) == 5){
