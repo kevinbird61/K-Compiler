@@ -2,12 +2,12 @@
 ## Author
  - Kevin Chiu , `kevinbird61@gmail.com`
   - Welcome to fork this K-compiler , and revise its memory usage.
-  - If you're willing , I'll invite you to join K-compiler.
+  - If you're willing , I'm sincerely invite you to join K-compiler.
 
 ## Now Support 
  - You can see in the test file : `src/test.c`
 
-## PreStart
+## PreStart (Environment Setting , on Linux)
  - `sudo apt-get install flex` : to get lex
  - `sudo apt-get install bison` : to get GNU version of yacc
 
