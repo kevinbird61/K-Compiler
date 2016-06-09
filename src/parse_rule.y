@@ -156,11 +156,6 @@ Program: declList {
 		assemFile.open("run_compile.s");
 		// At the end 
 		assemFile << "\t.data\n" << _data << "\t.text\n\t.globl main\n" << _text;	
-		/*
-		for(int i = 0 ; i < stack_header; i++){
-			cout << Variable_List[i] << " ";
-		}
-		cout << endl;*/
 	}
 	;
 	
@@ -566,7 +561,52 @@ stmt: SEMICOLON {
 
 expr: unaryOp expr {
 		// Because unaryOp only have "!" , so we do this thing only 
-		*$$ = "!" + *$2;
+		// *$$ = "!" + *$2;
+		// Judge *$2
+		int judge = judge_category(*$2);
+		// require a temp register 
+		string temp("$t");
+		temp += int2str(t_reg_index);
+		t_reg_index++;	
+		if(judge == 2){
+			// Variable , we need to pop out its value and change it's current value and store it back
+			// First we need to get the variables
+			int index = whereVariable(*$2);
+			// Load the value out
+			ss << "\tlw " << temp << ", " << (index*4) << "($sp)\n";
+			// Judge it , if temp == 0 , we need to change it into 1
+			ss << "\tbeq " << temp << ", $zero , SetOne\n";
+			// Else , set temp = 0 , and then jump to the endUn
+			ss << "\taddi " << temp << ", $zero , 0\n";
+			ss << "\tj EndUn\n";
+			// Add tag "SetOne"
+			ss << "SetOne:\n";
+			// set the temp to 1
+			ss << "\taddi " << temp << ", $zero , 1\n";
+			// add the tag "EndUn" , and then store it back
+			ss << "EndUn:\n";
+			ss << "\tsw "<< temp << ", " << (index*4) << "$(sp)\n";
+		}
+		else if(judge == 3){
+			// TODO ArrayList
+		}
+		else if(judge == 0){
+			// Pure number 
+			if(*$2 == 0){
+				*$2 = 1;
+			}
+			else{
+				*$2 = 0;
+			}
+		}
+		else{
+			// TODO , complex version of Unary operation
+		
+		}
+		// Release temp register usage
+		t_reg_index--;
+		// And then return the original expr 
+		*$$ = *$2;
 	}
 	| NUM expr_D { 
 		ss << $1;
@@ -879,12 +919,13 @@ string make_if_expr(string OP , string data1, string data2){
 		Rreg = temp_r;
 	}
 	else if(judge_category(data2) == 5){
-		// TODO a_reg
+		// TODO , if expr is a_reg
 	}
 	else{
-		// TODO extend mode
+		// TODO extend mode (expr with another expr condition)
 	}
-	// Require another temp register
+	
+	// ==================================== Require another temp register , do the translate
 	string temp_j("$t");
 	temp_j += int2str(t_reg_index);
 	t_reg_index++;
