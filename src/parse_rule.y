@@ -351,7 +351,7 @@ varDecl_D: SEMICOLON {
 	;
 
 stmtList: stmt stmtList_D {
-		*$$ = *$1;
+		*$$ = *$1+*$2;
 	}
 	;
 	
@@ -509,9 +509,11 @@ stmt: SEMICOLON {
 			ss << "\tsyscall\n"; 
 		}
 		// FIXME : print for char 
-		_temp += ss.str(); ss.str("");
+		string forprint("");
+		forprint = ss.str(); ss.str("");
+		_temp += forprint;
 		t_reg_index--;
-		*$$ = "";
+		*$$ = forprint;
 	}
 	| READ ID { 
 		/* Do read command */ 
@@ -554,8 +556,10 @@ stmt: SEMICOLON {
 			ss << "\tsw  $v0, " << (index*4) << "($sp)\n";
 		}
 		// FIXME : print for char 
-		_temp += ss.str(); ss.str("");
-		*$$ = "";	
+		string forread("");
+		forread = ss.str(); ss.str("");
+		_temp += forread;
+		*$$ = forread;	
 	}
 	;
 
@@ -592,11 +596,11 @@ expr: unaryOp expr {
 		}
 		else if(judge == 0){
 			// Pure number 
-			if(*$2 == 0){
-				*$2 = 1;
+			if(*$2 == "0"){
+				*$2 = "1";
 			}
 			else{
-				*$2 = 0;
+				*$2 = "0";
 			}
 		}
 		else{
@@ -1175,7 +1179,7 @@ void dealing_Expr(){
 	L_reg += int2str(t_reg_index); 
 	t_reg_index++;
 	ss << "\t#Assignment\n";
-	ss << "\taddi "<< L_reg << ", "<< L_reg << " , 0 \n";
+	ss << "\taddi "<< L_reg << ", $zero, 0 \n";
 	while(Data_stack.size()>=1){
 		string data1,data2;
 		if(Data_stack.size()>=2){
@@ -1282,7 +1286,7 @@ string dealWithPriority(vector<string> List){
 	string current_t_reg("$t");
 	current_t_reg += int2str(t_reg_index);
 	t_reg_index++;
-	ss << "\taddi "<< current_t_reg << ", "<< current_t_reg << " , 0 \n";
+	ss << "\taddi "<< current_t_reg << ", $zero , 0 \n";
 	while(Data.size() >= 1){
 		string data1,data2;
 		if(Data.size()>=2){
