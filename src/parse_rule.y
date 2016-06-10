@@ -55,8 +55,7 @@ string *a_reg = new string[4]; // Record the argument register
 string *t_reg = new string[10]; // Only for Calculation
 int a_reg_index = 0;
 int t_reg_index = 0;
-vector<int> stack_tailer_rv; // Store the return value of stack tailer
-int stack_header = 0; // Record the current usage location
+int stack_header = 1; // Record the current usage location
 int stack_tailer = 0; // Record the current started location
 %}
 
@@ -156,6 +155,10 @@ Program: declList {
 		assemFile.open("run_compile.s");
 		// At the end 
 		assemFile << "\t.data\n" << _data << "\t.text\n\t.globl main\n" << _text;	
+		
+		for(int i = 0 ; i < stack_header ; i++){
+			cout << Variable_List[i] << endl;
+		}
 	}
 	;
 	
@@ -412,7 +415,9 @@ stmt: SEMICOLON {
 				string temp_r("$t");
 				temp_r += int2str(t_reg_index);
 				t_reg_index++;
-				ss << "\tlw " << temp_r << ", " << (index*4)<<"($sp)\n";
+				ss << "\taddi $sp , $sp , " << -(index*4) << "\n";
+				ss << "\tlw " << temp_r << ", 0($sp)\n";
+				ss << "\taddi $sp , $sp , " << (index*4) << "\n";
 				ss << "\taddi $v0 , $zero , 0\n"; // Clear the $v0
 				ss << "\tadd $v0, $v0, " << temp_r<<"\n";
 				_temp_expr += ss.str(); ss.str("");
@@ -482,7 +487,9 @@ stmt: SEMICOLON {
 					// Print it 
 					ss << "\t#For print " << array << "\n";
 					ss << "\taddi " << temp_r << ", $zero , 0\n";
-					ss << "\tlw " << temp_r << ", " << (i*4) << "($sp)\n";
+					ss << "\taddi $sp , $sp , " << -(i*4) << "\n";
+					ss << "\tlw " << temp_r << ", 0($sp)\n";
+					ss << "\taddi $sp , $sp , " << (i*4) << "\n";
 					ss << "\tli $v0 , 1\n";
 					ss << "\tmove $a0, " << temp_r << "\n";
 					ss << "\tsyscall\n";
@@ -503,7 +510,9 @@ stmt: SEMICOLON {
 			}
 			ss << "\t#For print " << *$2 << "\n";
 			ss << "\taddi " << temp_r << ", $zero , 0\n";
-			ss << "\tlw " << temp_r << ", " << (index*4) << "($sp)\n";
+			ss << "\taddi $sp , $sp , " << -(index*4) << "\n";
+			ss << "\tlw " << temp_r << ", 0($sp)\n";
+			ss << "\taddi $sp , $sp , " << (index*4) << "\n";
 			ss << "\tli $v0 , 1\n";
 			ss << "\tmove $a0, " << temp_r << "\n";
 			ss << "\tsyscall\n"; 
@@ -534,7 +543,9 @@ stmt: SEMICOLON {
 					ss << "\t#For read " << array << "\n";
 					ss << "\tli $v0 , 5\n";
 					ss << "\tsyscall\n";
-					ss << "\tsw  $v0, " << (i*4) << "($sp)\n";
+					ss << "\taddi $sp , $sp , " << -(i*4) << "\n";
+					ss << "\tsw  $v0, 0($sp)\n";
+					ss << "\taddi $sp , $sp , " << (i*4) << "\n";
 					// And then change array's name
 					arr_index++;
 					array = *$2 + "[" + int2str(arr_index) + "]";
@@ -553,7 +564,9 @@ stmt: SEMICOLON {
 			ss << "\t#For read " << *$2 << "\n";
 			ss << "\tli $v0 , 5\n";
 			ss << "\tsyscall\n";
-			ss << "\tsw  $v0, " << (index*4) << "($sp)\n";
+			ss << "\taddi $sp , $sp , " << -(index*4) << "\n";
+			ss << "\tsw  $v0, 0($sp)\n";
+			ss << "\taddi $sp , $sp , " << (index*4) << "\n";
 		}
 		// FIXME : print for char 
 		string forread("");
@@ -577,7 +590,8 @@ expr: unaryOp expr {
 			// First we need to get the variables
 			int index = whereVariable(*$2);
 			// Load the value out
-			ss << "\tlw " << temp << ", " << (index*4) << "($sp)\n";
+			ss << "\taddi $sp , $sp , " << - (index*4) << "\n";
+			ss << "\tlw " << temp << ", 0($sp)\n";
 			// Judge it , if temp == 0 , we need to change it into 1
 			ss << "\tbeq " << temp << ", $zero , SetOne\n";
 			// Else , set temp = 0 , and then jump to the endUn
@@ -589,7 +603,8 @@ expr: unaryOp expr {
 			ss << "\taddi " << temp << ", $zero , 1\n";
 			// add the tag "EndUn" , and then store it back
 			ss << "EndUn:\n";
-			ss << "\tsw "<< temp << ", " << (index*4) << "$(sp)\n";
+			ss << "\tsw "<< temp << ", 0$(sp)\n";
+			ss << "\taddi $sp , $sp , " << (index*4) << "\n";
 		}
 		else if(judge == 3){
 			// TODO ArrayList
@@ -782,7 +797,9 @@ string make_while_expr(string OP , string data1, string data2){
 		string temp_r("$t");
 		temp_r += int2str(t_reg_index);
 		t_reg_index++;
-		ss << "\tlw " << temp_r << ", " << (index*4) << "($sp)\n";
+		ss << "\taddi $sp , $sp , " << -(index*4) << "\n";
+		ss << "\tlw " << temp_r << ", 0($sp)\n";
+		ss << "\taddi $sp , $sp , " << (index*4) << "\n";
 		Lreg = temp_r;
 	}
 	else if(judge_category(data1) == 0){
@@ -806,7 +823,9 @@ string make_while_expr(string OP , string data1, string data2){
 		string temp_r("$t");
 		temp_r += int2str(t_reg_index);
 		t_reg_index++;
-		ss << "\tlw " << temp_r << ", " << (index*4) << "($sp)\n";
+		ss << "\taddi $sp , $sp , " << -(index*4) << "\n";
+		ss << "\tlw " << temp_r << ", 0($sp)\n";
+		ss << "\taddi $sp , $sp , " << (index*4) << "\n";
 		Rreg = temp_r;
 	}
 	else if(judge_category(data2) == 0){
@@ -887,7 +906,9 @@ string make_if_expr(string OP , string data1, string data2){
 		string temp_r("$t");
 		temp_r += int2str(t_reg_index);
 		t_reg_index++;
-		ss << "\tlw " << temp_r << ", " << (index*4) << "($sp)\n";
+		ss << "\taddi $sp , $sp , " << -(index*4) << "\n";
+		ss << "\tlw " << temp_r << ", 0($sp)\n";
+		ss << "\taddi $sp , $sp , " << (index*4) << "\n";
 		Lreg = temp_r;
 	}
 	else if(judge_category(data1) == 0){
@@ -911,7 +932,9 @@ string make_if_expr(string OP , string data1, string data2){
 		string temp_r("$t");
 		temp_r += int2str(t_reg_index);
 		t_reg_index++;
-		ss << "\tlw " << temp_r << ", " << (index*4) << "($sp)\n";
+		ss << "\taddi $sp , $sp , " << -(index*4) << "\n";
+		ss << "\tlw " << temp_r << ", 0($sp)\n";
+		ss << "\taddi $sp , $sp , " << (index*4) << "\n";
 		Rreg = temp_r;
 	}
 	else if(judge_category(data2) == 0){
@@ -996,7 +1019,7 @@ void dealing_Expr(){
 			break;
 		}
 	}
-	for(int k = 0; k < stack_header ; k++){
+	for(int k = 1; k < stack_header ; k++){
 		if(Variable_List[k] == L_str){
 			flag = 1;
 			store_index = k; // For
@@ -1009,7 +1032,7 @@ void dealing_Expr(){
 	}
 	else{
 		// Check out if it is a Variable
-		for(int k = 0 ; k < stack_header ; k++){
+		for(int k = 1 ; k < stack_header ; k++){
 			if(Variable_List[k] == Lvalue_list[0]){
 				flag = 2;
 				store_index = k;
@@ -1023,6 +1046,7 @@ void dealing_Expr(){
 			exit(1);
 		}
 	}
+	
 	// And now , we can dealing with Right side
 	int Op_change_flag = 0;
 	for(vector<string>::iterator i = Rvalue_list.begin(); i != Rvalue_list.end() ; i++){
@@ -1050,7 +1074,9 @@ void dealing_Expr(){
 						// Search its stack location
 						int jud = whereVariable(temp_data);
 						if(jud != -1){
-							ss << "\tlw $a"<< a_reg_index << " ,"<< jud <<"($sp)\n";
+							ss << "\taddi $sp , $sp , " << -(jud*4) << "\n";
+							ss << "\tlw $a"<< a_reg_index << " , 0($sp)\n";
+							ss << "\taddi $sp , $sp , " << (jud*4) << "\n";
 							_temp_expr += ss.str(); ss.str("");
 							a_reg_index++;
 						}
@@ -1063,7 +1089,9 @@ void dealing_Expr(){
 						// This is an variable
 						int jud = whereVariable(*k);
 						if(jud != -1){
-							ss << "\tlw $a"<< a_reg_index << " ,"<< jud*4 << "($sp)\n";
+							ss << "\taddi $sp , $sp " << -(jud*4) << "\n";
+							ss << "\tlw $a"<< a_reg_index << " , 0($sp)\n";
+							ss << "\taddi $sp , $sp " << (jud*4) << "\n";
 							_temp_expr += ss.str(); ss.str("");
 							a_reg_index++;
 						}
@@ -1222,8 +1250,11 @@ void dealing_Expr(){
 			}
 		}
 	}
+	cout << "~~~~~~~~~~~~~~~~~~~~~~~~~~~~store index = " << store_index << endl;
 	// Assign the L_reg to the Lvalue storage location
-	ss << "\tsw " << L_reg << ", " << (store_index*4) << "($sp)\n";
+	ss << "\taddi $sp , $sp ," << -(store_index*4)<< "\n";
+	ss << "\tsw " << L_reg << ", 0($sp)\n";
+	ss << "\taddi $sp , $sp ," << (store_index*4)<< "\n";
 	_temp_expr += ss.str(); ss.str("");
 	// At Least , clean out the vector
 	if(t_reg_index != 0)
@@ -1341,7 +1372,9 @@ void trans_code2MIPS(string OP,string Data1,string Data2 ,string current_registe
 				t_reg_index++;
 				int index = i*4;
 				// and now load it into temp register
-				ss << "\tlw "<< reg1 << ", " <<int2str(index)+"($sp)\n";
+				ss << "\taddi $sp , $sp , " << -index << "\n"; 
+				ss << "\tlw "<< reg1 << ", 0($sp)\n";
+				ss << "\taddi $sp , $sp , " << index << "\n"; 
 				t_usage++;
 				break;
 			}
@@ -1375,7 +1408,9 @@ void trans_code2MIPS(string OP,string Data1,string Data2 ,string current_registe
 				int index = i*4;
 				t_usage++;
 				// and now load it into temp register
-				ss << "\tlw "<< reg2<< ", " <<int2str(index)+"($sp)\n";
+				ss << "\taddi $sp , $sp , " << -index << "\n"; 
+				ss << "\tlw "<< reg2<< ", 0($sp)\n";
+				ss << "\taddi $sp , $sp , " << index << "\n"; 
 				break;
 			}
 		}
@@ -1537,7 +1572,7 @@ int push_stack(int type , string ID , int size){
 
 int whereVariable(string ID){
 	for(int i = 0; i < stack_header ; i++){
-		if(Variable_List[i] == ID)
+		if(Variable_List[i] == ID && Variable_List[i].size() > 0)
 			return i;
 	}
 	return -1;
