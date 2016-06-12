@@ -57,6 +57,8 @@ int a_reg_index = 0;
 int t_reg_index = 0;
 int stack_header = 1; // Record the current usage location
 int stack_tailer = 0; // Record the current started location
+int while_tag = 0;
+int if_tag = 0;
 %}
 
 %code requires {
@@ -457,12 +459,14 @@ stmt: SEMICOLON {
 		int if_stmt_sz = $5->size();
 		int else_stmt_sz = $7->size();
 		if_else_toMIPS(if_stmt,else_stmt,if_stmt_sz,else_stmt_sz,*$3);
+		if_tag++;
 	}
 	| WHILE LEFT_PARENTHESE expr RIGHT_PARENTHESE stmt { 
 		/* Do while clause */ 
 		size_t while_stmt = _temp.find(*$5);
 		int while_stmt_sz = $5->size();
 		while_toMIPS(while_stmt,while_stmt_sz,*$3);
+		while_tag++;
 	}
 	| block { 
 		*$$ = *$1;
@@ -744,9 +748,9 @@ void while_toMIPS(size_t while_stmt_loc , int while_stmt_size , string while_exp
 	}
 	// Now we need to insert or condition into _temp (Consider the order and the index , we insert from back to former)
 	// Step 1 , insert EndWhile
-	_temp.insert(while_stmt_loc + while_stmt_size,"\tj WHILE\nEndWhile:\n");
+	_temp.insert(while_stmt_loc + while_stmt_size,"\tj WHILE"+ int2str(while_tag) +"\nEndWhile"+int2str(while_tag)+":\n");
 	// Step 2, insert for_WHILEexpr
-	_temp.insert(while_stmt_loc,"WHILE:\n"+for_WHILEexpr);
+	_temp.insert(while_stmt_loc,"WHILE"+int2str(while_tag)+":\n"+for_WHILEexpr);
 	// Step 3, insert "WHILE:\n" tag
 }
 
@@ -781,9 +785,9 @@ void if_else_toMIPS(size_t if_stmt_loc , size_t else_stmt_loc , int if_stmt_size
 	}
 	// Now we need to insert or condition into _temp (Consider the order and the index , we insert from back to former)
 	// Step 1 , insert Endif
-	_temp.insert(else_stmt_loc+else_stmt_size,"Endif:\n");
+	_temp.insert(else_stmt_loc+else_stmt_size,"Endif"+int2str(if_tag)+":\n");
 	// Step 2, insert "\tj End if\nElse:\n" condition
-	_temp.insert(else_stmt_loc,"\tj Endif\nElse:\n");
+	_temp.insert(else_stmt_loc,"\tj Endif"+int2str(if_tag)+"\nElse"+int2str(if_tag)+":\n");
 	// Step 3 , insert for_IFexpr into the start of stmt 
 	_temp.insert(if_stmt_loc,for_IFexpr);
 }
@@ -849,39 +853,39 @@ string make_while_expr(string OP , string data1, string data2){
 	// Now we have Lreg and Rreg
 	if(OP == "<"){
 		ss << "\tslt " << temp_j << ", " << Lreg << ", " << Rreg << "\n"; // Origin: Lreg < Rreg , if yes , temp_j = 1 ,else temp_j = 0
-		ss << "\tbeq " << temp_j << ", 0 , EndWhile\n"; // If temp_j == 0 , jump to Else stmt . FIXME , Else tag need to be unique
+		ss << "\tbeq " << temp_j << ", 0 , EndWhile"+int2str(while_tag)+"\n"; // If temp_j == 0 , jump to Else stmt . FIXME , Else tag need to be unique
 	}
 	else if(OP == ">"){
 		ss << "\tslt " << temp_j << ", " << Lreg << ", " << Rreg << "\n"; // Origin: Lreg < Rreg , if yes , temp_j = 1 ,else temp_j = 0
-		ss << "\tbeq " << temp_j << ", 1 , EndWhile\n"; // If temp_j == 0 , jump to Else stmt . FIXME , Else tag need to be unique
+		ss << "\tbeq " << temp_j << ", 1 , EndWhile"+int2str(while_tag)+"\n"; // If temp_j == 0 , jump to Else stmt . FIXME , Else tag need to be unique
 	}
 	else if(OP == ">="){
 		ss << "\tsub " << temp_j << ", " << Lreg << ", " << Rreg << "\n"; // tempj = Lreg - Rreg
-		ss << "\tbltz " << temp_j << ", EndWhile\n";	// If temp_j < 0  , jump to Else
+		ss << "\tbltz " << temp_j << ", EndWhile"+int2str(while_tag)+"\n";	// If temp_j < 0  , jump to Else
 	}
 	else if(OP == "<="){
 		ss << "\tsub " << temp_j << ", " << Lreg << ", " << Rreg << "\n"; // tempj = Lreg - Rreg
-		ss << "\tbgtz " << temp_j << ", EndWhile\n";	// If temp_j > 0  , jump to Else
+		ss << "\tbgtz " << temp_j << ", EndWhile"+int2str(while_tag)+"\n";	// If temp_j > 0  , jump to Else
 	}
 	else if(OP == "&&"){
 		// Judge Lreg , if Lreg == 0 , then jump to endwhile
-		ss << "\tbeq " << Lreg << ", $zero , EndWhile\n";
+		ss << "\tbeq " << Lreg << ", $zero , EndWhile"+int2str(while_tag)+"\n";
 		// Judge Rreg , if Rreg == 0 , then jump to endwhile
-		ss << "\tbeq " << Rreg << ", $zero , EndWhile\n";
+		ss << "\tbeq " << Rreg << ", $zero , EndWhile"+int2str(while_tag)+"\n";
 	}
 	else if(OP == "||"){
 		// Judge Lreg , if Lreg == 1 , then jump to the tag we add (on the end of this expr , which concat with the while-stmt)
-		ss << "\tbeq " << Lreg << ", 1 , goWHILE\n"; 
+		ss << "\tbeq " << Lreg << ", 1 , goWHILE"+int2str(while_tag)+"\n"; 
 		// Judge Rreg , mention that , if we run to this code , it means now Lreg = 0 , so when Rreg = 0 , it need to go to endwhile
-		ss << "\tbeq " << Rreg << ", 0 , EndWhile\n";
+		ss << "\tbeq " << Rreg << ", 0 , EndWhile"+int2str(while_tag)+"\n";
 		// At the end , we add the tag which the above statement can jump
-		ss << "goWHILE:\n";
+		ss << "goWHILE"+int2str(while_tag)+":\n";
 	}
 	else if(OP == "!="){
-		ss << "\tbne " << Lreg << ", " << Rreg << ", EndWhile\n";
+		ss << "\tbne " << Lreg << ", " << Rreg << ", EndWhile"+int2str(while_tag)+"\n";
 	}
 	else if(OP == "=="){
-		ss << "\tbeq " << Lreg << ", " << Rreg << ", EndWhile\n";
+		ss << "\tbeq " << Lreg << ", " << Rreg << ", EndWhile"+int2str(while_tag)+"\n";
 	}
 	else{
 		// Not in condition
@@ -959,39 +963,39 @@ string make_if_expr(string OP , string data1, string data2){
 	// Now we have Lreg and Rreg
 	if(OP == "<"){
 		ss << "\tslt " << temp_j << ", " << Lreg << ", " << Rreg << "\n"; // Origin: Lreg < Rreg , if yes , temp_j = 1 ,else temp_j = 0
-		ss << "\tbeq " << temp_j << ", 0 , Else\n"; // If temp_j == 0 , jump to Else stmt . FIXME , Else tag need to be unique
+		ss << "\tbeq " << temp_j << ", 0 , Else"+int2str(if_tag)+"\n"; // If temp_j == 0 , jump to Else stmt . FIXME , Else tag need to be unique
 	}
 	else if(OP == ">"){
 		ss << "\tslt " << temp_j << ", " << Lreg << ", " << Rreg << "\n"; // Origin: Lreg < Rreg , if yes , temp_j = 1 ,else temp_j = 0
-		ss << "\tbeq " << temp_j << ", 1 , Else\n"; // If temp_j == 0 , jump to Else stmt . FIXME , Else tag need to be unique
+		ss << "\tbeq " << temp_j << ", 1 , Else"+int2str(if_tag)+"\n"; // If temp_j == 0 , jump to Else stmt . FIXME , Else tag need to be unique
 	}
 	else if(OP == ">="){
 		ss << "\tsub " << temp_j << ", " << Lreg << ", " << Rreg << "\n"; // tempj = Lreg - Rreg
-		ss << "\tbltz " << temp_j << ", Else\n";	// If temp_j < 0  , jump to Else
+		ss << "\tbltz " << temp_j << ", Else"+int2str(if_tag)+"\n";	// If temp_j < 0  , jump to Else
 	}
 	else if(OP == "<="){
 		ss << "\tsub " << temp_j << ", " << Lreg << ", " << Rreg << "\n"; // tempj = Lreg - Rreg
-		ss << "\tbgtz " << temp_j << ", Else\n";	// If temp_j > 0  , jump to Else
+		ss << "\tbgtz " << temp_j << ", Else"+int2str(if_tag)+"\n";	// If temp_j > 0  , jump to Else
 	}
 	else if(OP == "&&"){
 		// Judge Lreg , if Lreg == 0 , then jump to else
-		ss << "\tbeq " << Lreg << ", $zero , Else\n";
+		ss << "\tbeq " << Lreg << ", $zero , Else"+int2str(if_tag)+"\n";
 		// Judge Rreg , if Rreg == 0 , then jump to else
-		ss << "\tbeq " << Rreg << ", $zero , Else\n";
+		ss << "\tbeq " << Rreg << ", $zero , Else"+int2str(if_tag)+"\n";
 	}
 	else if(OP == "||"){
 		// Judge Lreg , if Lreg == 1 , then jump to the tag we add (on the end of this expr , which concat with the if-stmt)
-		ss << "\tbeq " << Lreg << ", 1 , goIf\n"; 
+		ss << "\tbeq " << Lreg << ", 1 , goIf"+int2str(if_tag)+"\n"; 
 		// Judge Rreg , mention that , if we run to this code , it means now Lreg = 0 , so when Rreg = 0 , it need to go to endwhile
-		ss << "\tbeq " << Rreg << ", 0 , Else\n";
+		ss << "\tbeq " << Rreg << ", 0 , Else"+int2str(if_tag)+"n";
 		// At the end , we add the tag which the above statement can jump
-		ss << "goIf:\n";
+		ss << "goIf"+int2str(if_tag)+":\n";
 	}
 	else if(OP == "!="){
-		ss << "\tbne " << Lreg << ", " << Rreg << ", Else\n";
+		ss << "\tbne " << Lreg << ", " << Rreg << ", Else"+int2str(if_tag)+"\n";
 	}
 	else if(OP == "=="){
-		ss << "\tbeq " << Lreg << ", " << Rreg << ", Else\n";
+		ss << "\tbeq " << Lreg << ", " << Rreg << ", Else"+int2str(if_tag)+"\n";
 	}
 	else{
 		// Not in condition
@@ -1362,7 +1366,7 @@ void trans_code2MIPS(string OP,string Data1,string Data2 ,string current_registe
 	cout << "OP:" << OP << "; Data1:"<< Data1 << "; Data2:" << Data2 << "; current_register:" << current_register << endl;
 	// And now we can put it into the assembly code
 	// Transfer the Data1 , and Data2 to stack mode
-	int count = 0 , t_usage = 0;
+	int t_usage = 0;
 	string reg1,reg2;
 	// For data1 convert
 	if(judge_category(Data1)==2){
