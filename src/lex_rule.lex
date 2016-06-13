@@ -24,7 +24,10 @@ identifier [i][d][A-Z][a-z]*
 {DIGIT}  { yylval.int_val = atoi(yytext); return NUM;}
 [ ]*[-]{DIGIT} { yylval.int_val = atoi(yytext); return NUM;}
 {identifier}+ { yylval.str = new std::string(yytext); return ID;}
-["][a-zA-z]["] { yylval.int_val = atoi(yytext); return NUM; /* Take char and int equally */ }
+["][a-zA-z]["] { 
+	yylval.int_val = (int)(yytext[1]); // Turn it into integer
+	return NUM; /* Take char and int equally */ 
+	}
 
 "(" { yylval.str = new std::string(yytext); return LEFT_PARENTHESE;}
 ")" { yylval.str = new std::string(yytext); return RIGHT_PARENTHESE;}
