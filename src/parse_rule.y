@@ -12,7 +12,7 @@
 int yyerror(char *s) ;
 int yylex(void);
 // push_stack : used for variable allocate , with return value - stack_header(denote as the currently usage of stack)
-int push_stack(int type , string ID , int size);
+int push_stack(int type , string ID , int size , int ID_type);
 // Search whether this ID has been used or not (usage in push_stack)
 int search_duplicate(string ID);
 // Judge the input Op1 and Op2 , which one has more power (Priority)
@@ -47,6 +47,7 @@ string _text = "";
 string _temp = "";
 string _temp_expr = "";
 string *Variable_List = new string[100]; // Record the ID and it's stack location
+string *Variable_List_type = new string[100]; // Record the ID's type 
 vector<string> function_list;// Record the function name we defined
 vector<string> array_list;
 vector<string> Lvalue_list;
@@ -311,11 +312,11 @@ varDecl: type ID varDecl_D {
 			/* Variable define */
 			if($1==1){
 				cout << "Variable: Get type with Int  , And ID is " << *$2 << endl; /* Because $2 is address */
-				push_stack(0,*$2,1);
+				push_stack(0,*$2,1,0);
 			}
 			else{
 				cout << "Variable: Get type with Char , And ID is " << *$2 << endl;
-				push_stack(0,*$2,1);
+				push_stack(0,*$2,1,1);
 			}
 		}
 		else if($3.type==1)
@@ -323,12 +324,12 @@ varDecl: type ID varDecl_D {
 			/* Array define */
 			if($1==1){
 				cout << "Variable: Get type with Int  , And array name is " << *$2 << ", with Size :" << $3.size << endl; /* Because $2 is address */
-				push_stack(1,*$2,$3.size);
+				push_stack(1,*$2,$3.size,0);
 				array_list.push_back(*$2);
 			}
 			else{
 				cout << "Variable: Get type with Char , And array name is " << *$2 << ", with Size :" << $3.size << endl;
-				push_stack(1,*$2,$3.size);
+				push_stack(1,*$2,$3.size,1);
 				array_list.push_back(*$2);
 			}
 		}
@@ -448,8 +449,9 @@ stmt: SEMICOLON {
 	}
 	| BREAK SEMICOLON { 
 		/* Need to find out the scope , and then branch out of it */
-		cout << "Accept Break condition" << endl;
-		// TODO break condition;
+		// Consider that the only 1 for-loop in this c-like language , so we only need to do "While" 
+		// Directly jump to EndWhile tag
+		_temp += "\tj EndWhile" + int2str(while_tag) + "\n";
 		*$$ = "";	
 	}
 	| IF LEFT_PARENTHESE expr RIGHT_PARENTHESE stmt ELSE stmt { 
@@ -488,18 +490,34 @@ stmt: SEMICOLON {
 			// Find it's size 
 			for(int i = 0; i < stack_header ; i++){
 				if(array == Variable_List[i]){
-					// Print it 
-					ss << "\t#For print " << array << "\n";
-					ss << "\taddi " << temp_r << ", $zero , 0\n";
-					ss << "\taddi $sp , $sp , " << -(i*4) << "\n";
-					ss << "\tlw " << temp_r << ", 0($sp)\n";
-					ss << "\taddi $sp , $sp , " << (i*4) << "\n";
-					ss << "\tli $v0 , 1\n";
-					ss << "\tmove $a0, " << temp_r << "\n";
-					ss << "\tsyscall\n";
-					// And then change array's name
-					arr_index++;
-					array = *$2 + "[" + int2str(arr_index) + "]";
+					if(Variable_List_type[i] == "INT"){
+						// Print it 
+						ss << "\t#For print " << array << "\n";
+						ss << "\taddi " << temp_r << ", $zero , 0\n";
+						ss << "\taddi $sp , $sp , " << -(i*4) << "\n";
+						ss << "\tlw " << temp_r << ", 0($sp)\n";
+						ss << "\taddi $sp , $sp , " << (i*4) << "\n";
+						ss << "\tli $v0 , 1\n";
+						ss << "\tmove $a0, " << temp_r << "\n";
+						ss << "\tsyscall\n";
+						// And then change array's name
+						arr_index++;
+						array = *$2 + "[" + int2str(arr_index) + "]";
+					}
+					else if(Variable_List_type[i] == "CHAR"){
+						// Print it 
+						ss << "\t#For print " << array << "\n";
+						ss << "\taddi " << temp_r << ", $zero , 0\n";
+						ss << "\taddi $sp , $sp , " << -(i*4) << "\n";
+						ss << "\tlw " << temp_r << ", 0($sp)\n";
+						ss << "\taddi $sp , $sp , " << (i*4) << "\n";
+						ss << "\tli $v0 , 11\n";
+						ss << "\tmove $a0, " << temp_r << "\n";
+						ss << "\tsyscall\n";
+						// And then change array's name
+						arr_index++;
+						array = *$2 + "[" + int2str(arr_index) + "]";
+					}
 				}
 			}
 		}
@@ -512,14 +530,26 @@ stmt: SEMICOLON {
 					break;
 				}
 			}
-			ss << "\t#For print " << *$2 << "\n";
-			ss << "\taddi " << temp_r << ", $zero , 0\n";
-			ss << "\taddi $sp , $sp , " << -(index*4) << "\n";
-			ss << "\tlw " << temp_r << ", 0($sp)\n";
-			ss << "\taddi $sp , $sp , " << (index*4) << "\n";
-			ss << "\tli $v0 , 1\n";
-			ss << "\tmove $a0, " << temp_r << "\n";
-			ss << "\tsyscall\n"; 
+			if(Variable_List_type[index] == "INT"){
+				ss << "\t#For print " << *$2 << "\n";
+				ss << "\taddi " << temp_r << ", $zero , 0\n";
+				ss << "\taddi $sp , $sp , " << -(index*4) << "\n";
+				ss << "\tlw " << temp_r << ", 0($sp)\n";
+				ss << "\taddi $sp , $sp , " << (index*4) << "\n";
+				ss << "\tli $v0 , 1\n";
+				ss << "\tmove $a0, " << temp_r << "\n";
+				ss << "\tsyscall\n"; 
+			}
+			else if(Variable_List_type[index] == "CHAR"){
+				ss << "\t#For print " << *$2 << "\n";
+				ss << "\taddi " << temp_r << ", $zero , 0\n";
+				ss << "\taddi $sp , $sp , " << -(index*4) << "\n";
+				ss << "\tlw " << temp_r << ", 0($sp)\n";
+				ss << "\taddi $sp , $sp , " << (index*4) << "\n";
+				ss << "\tli $v0 , 11\n";
+				ss << "\tmove $a0, " << temp_r << "\n";
+				ss << "\tsyscall\n";
+			}
 		}
 		// FIXME : print for char 
 		string forprint("");
@@ -543,7 +573,7 @@ stmt: SEMICOLON {
 			// Find it's size 
 			for(int i = 0; i < stack_header ; i++){
 				if(array == Variable_List[i]){
-					// Print it 
+					// Read it 
 					ss << "\t#For read " << array << "\n";
 					ss << "\tli $v0 , 5\n";
 					ss << "\tsyscall\n";
@@ -1539,11 +1569,19 @@ int judgeOp(string OP1 , string OP2){
 	}
 }
 
-int push_stack(int type , string ID , int size){
+int push_stack(int type , string ID , int size , int ID_type){
 	if(type == 0){
 		if(search_duplicate(ID)==1){
 			// New a stack for ID
 			Variable_List[stack_header] = ID;
+			if( ID_type == 0){
+				// Int type 
+				Variable_List_type[stack_header] = "INT";
+			}
+			else if( ID_type == 1){
+				// Char type 
+				Variable_List_type[stack_header] = "CHAR";
+			}
 			ss << "\t#" << ID << " is in " << stack_header*4 <<"($sp)\n";
 			ss << "\taddi $sp , $sp , "<< -4*stack_header<<"\n";
 			ss << "\taddi $t0 , $zero , 0\n";
@@ -1554,6 +1592,7 @@ int push_stack(int type , string ID , int size){
 		}
 		else{
 			cout << ID <<", variable existed!" <<endl;
+			exit(1);
 		}	
 	}
 	else{
@@ -1561,7 +1600,15 @@ int push_stack(int type , string ID , int size){
 			// New a stack for ID
 			for(int i = stack_header ; i < stack_header + size ; i++){
 				ss << i - stack_header;
-				Variable_List[i] = ID+"["+ss.str()+"]"; ss.str(""); 
+				Variable_List[i] = ID+"["+ss.str()+"]"; ss.str("");
+				if( ID_type == 0){
+					// Int type 
+					Variable_List_type[i] = "INT";
+				}
+				else if( ID_type == 1){
+					// Char type 
+					Variable_List_type[i] = "CHAR";
+				}
 			}
 			ss << "\t#From "<<stack_header*4<<"($sp) to "<<(stack_header+size)*4<<"($sp) now is occupied by"<< ID <<"[]\n";
 			_temp += ss.str(); ss.str("");
@@ -1569,6 +1616,7 @@ int push_stack(int type , string ID , int size){
 		}
 		else{
 			cout << ID <<", array existed!" <<endl;
+			exit(1);
 		}	
 	}
 	return 0;
