@@ -25,6 +25,8 @@ int whereVariable(string ID);
 void dealing_Expr();
 // Translate the result of expr to MIPS
 void trans_code2MIPS(string OP,string Data1,string Data2,string current_register);
+// Passing one variable into temp register in MIPS
+void trans_var2MIPS(string data , string current_register);
 // Do the If - else expr's translation
 void if_else_toMIPS(size_t if_stmt_loc , size_t else_stmt_loc , int if_stmt_size , int else_stmt_size ,string if_expr);
 // Do the while expr's translation
@@ -32,7 +34,7 @@ void while_toMIPS(size_t while_stmt_loc , int while_stmt_size , string while_exp
 // Doing the if's expr , and return the MIPS code in string , which the caller has this usage to concate in the final output
 string make_if_expr(string OP , string data1, string data2);
 // Doing the while's expr , and return the MIPS code in string , which the caller has this usage to concate in the final output
-string make_while_expr(string OP , string data1, string data2);
+string make_while_expr(string OP , string data1, string data2 , int data_type);
 // Make the int to string 
 string int2str(int &i);
 // Judge the raw string - ID's category
@@ -60,6 +62,7 @@ int stack_header = 1; // Record the current usage location
 int stack_tailer = 0; // Record the current started location
 int while_tag = 0;
 int if_tag = 0;
+int un_tag = 0;
 %}
 
 %code requires {
@@ -602,7 +605,6 @@ stmt: SEMICOLON {
 			ss << "\tsw  $v0, 0($sp)\n";
 			ss << "\taddi $sp , $sp , " << (index*4) << "\n";
 		}
-		// FIXME : print for char 
 		string forread("");
 		forread = ss.str(); ss.str("");
 		_temp += forread;
@@ -627,16 +629,16 @@ expr: unaryOp expr {
 			ss << "\taddi $sp , $sp , " << - (index*4) << "\n";
 			ss << "\tlw " << temp << ", 0($sp)\n";
 			// Judge it , if temp == 0 , we need to change it into 1
-			ss << "\tbeq " << temp << ", $zero , SetOne\n";
+			ss << "\tbeq " << temp << ", $zero , SetOne"+int2str(un_tag)+"\n";
 			// Else , set temp = 0 , and then jump to the endUn
 			ss << "\taddi " << temp << ", $zero , 0\n";
-			ss << "\tj EndUn\n";
+			ss << "\tj EndUn"+int2str(un_tag)+"\n";
 			// Add tag "SetOne"
-			ss << "SetOne:\n";
+			ss << "SetOne"+int2str(un_tag)+":\n";
 			// set the temp to 1
 			ss << "\taddi " << temp << ", $zero , 1\n";
 			// add the tag "EndUn" , and then store it back
-			ss << "EndUn:\n";
+			ss << "EndUn"+int2str(un_tag)+":\n";
 			ss << "\tsw "<< temp << ", 0$(sp)\n";
 			ss << "\taddi $sp , $sp , " << (index*4) << "\n";
 		}
@@ -659,6 +661,7 @@ expr: unaryOp expr {
 		// Release temp register usage
 		t_reg_index--;
 		// And then return the original expr 
+		un_tag++;
 		*$$ = *$2;
 	}
 	| NUM expr_D { 
@@ -749,32 +752,61 @@ binOp: B_PLUS { $$ = new string("+");}
 %%
 void while_toMIPS(size_t while_stmt_loc , int while_stmt_size , string while_expr){
 	// First , we need to judge whether if_expr is
-	// FIXME : make here more robust , here now only  a (>= , <= , < , > ) b , Extend to (expr) (> , < , <= , >=) (expr)
 	stringstream st(while_expr);
-	vector<string> Data;
-	vector<string> Op;
+	string main_op;
+	vector<string> Lexpr;
+	vector<string> Rexpr;
 	string token,for_WHILEexpr;
+	int flag = 0;
 	// Split out the expr 
 	while(getline(st, token , ',')){
 		if(judge_category(token) == 1){
-			Op.push_back(token);
+			if(flag == 2 || flag == 0){
+				main_op = token;
+				flag = 3;
+			}
+			else if(flag == 1){
+				Lexpr.push_back(token);
+			}
+			else if(flag == 3){
+				Rexpr.push_back(token);
+			}
 		}
 		else if(judge_category(token) == 2 || judge_category(token) == 5 || judge_category(token) == 0){
-			Data.push_back(token);
+			if(flag == 1 || flag == 0)
+				Lexpr.push_back(token);
+			else if(flag == 3)
+				Rexpr.push_back(token); // when flag == 3
+		}
+		else if(token == "("){
+			// Check currently stack  
+			if(flag == 0)
+				flag = 1;
+			else 
+				flag = 3;
+		}
+		else if(token == ")"){
+			flag = 2;
 		}
 	}
 	// And then make the if-exper
-	if(Data.size() == 2){
+	if(Lexpr.size() == 1 && Rexpr.size() == 1){
 		// For a Op b condition
-		string op = Op.front();
-		string L_expr = Data.front();
-		Data.erase(Data.begin());
-		string R_expr = Data.front();
-		for_WHILEexpr = make_while_expr(op , L_expr , R_expr);
+		string L_expr = Lexpr.front();
+		Lexpr.erase(Lexpr.begin());
+		string R_expr = Rexpr.front();
+		for_WHILEexpr = make_while_expr(main_op , L_expr , R_expr , 0);
 		// Has been tested , ok
 	}
 	else{
-		// TODO Extend condition (When only 1 data or > 2)
+		// Extend condition (make here more robust , here now only  a (>= , <= , < , > ) b , Extend to (expr) (> , < , <= , >=) (expr))
+		// Support the while( (Lexpr) Op (Rexpr) )
+		string cur_left_reg = dealWithPriority(Lexpr);
+		string cur_right_reg = dealWithPriority(Rexpr);
+		for_WHILEexpr = make_while_expr(main_op , cur_left_reg , cur_right_reg , 1);
+		//t_reg_index -= 2;
+		for_WHILEexpr = _temp_expr + for_WHILEexpr;
+		_temp_expr = "";
 	}
 	// Now we need to insert or condition into _temp (Consider the order and the index , we insert from back to former)
 	// Step 1 , insert EndWhile
@@ -822,59 +854,66 @@ void if_else_toMIPS(size_t if_stmt_loc , size_t else_stmt_loc , int if_stmt_size
 	_temp.insert(if_stmt_loc,for_IFexpr);
 }
 
-string make_while_expr(string OP , string data1, string data2){
+string make_while_expr(string OP , string data1, string data2 , int data_type){
 	// Transfer data1 and data2 to register mode
 	string Lreg , Rreg;
-	if(judge_category(data1) == 2){
-		// Varaible , (contain array with [])
-		int index = whereVariable(data1); // get mem location 
-		string temp_r("$t");
-		temp_r += int2str(t_reg_index);
-		t_reg_index++;
-		ss << "\taddi $sp , $sp , " << -(index*4) << "\n";
-		ss << "\tlw " << temp_r << ", 0($sp)\n";
-		ss << "\taddi $sp , $sp , " << (index*4) << "\n";
-		Lreg = temp_r;
+	if(data_type == 0){
+		if(judge_category(data1) == 2){
+			// Varaible , (contain array with [])
+			int index = whereVariable(data1); // get mem location 
+			string temp_r("$t");
+			temp_r += int2str(t_reg_index);
+			t_reg_index++;
+			ss << "\taddi $sp , $sp , " << -(index*4) << "\n";
+			ss << "\tlw " << temp_r << ", 0($sp)\n";
+			ss << "\taddi $sp , $sp , " << (index*4) << "\n";
+			Lreg = temp_r;
+		}
+		else if(judge_category(data1) == 0){
+			// Pure number
+			string temp_r("$t");
+			temp_r += int2str(t_reg_index);
+			t_reg_index++;
+			ss << "\taddi " << temp_r << ", " << temp_r << ", " << data1 << "\n";
+			Lreg = temp_r;
+		}
+		else if(judge_category(data1) == 5){
+			// TODO a_reg
+		}
+		else{
+			// TODO extend mode
+		}
+		// For Rreg
+		if(judge_category(data2) == 2){
+			// Varaible , (contain array with [])
+			int index = whereVariable(data2); // get mem location 
+			string temp_r("$t");
+			temp_r += int2str(t_reg_index);
+			t_reg_index++;
+			ss << "\taddi $sp , $sp , " << -(index*4) << "\n";
+			ss << "\tlw " << temp_r << ", 0($sp)\n";
+			ss << "\taddi $sp , $sp , " << (index*4) << "\n";
+			Rreg = temp_r;
+		}
+		else if(judge_category(data2) == 0){
+			// Pure number
+			string temp_r("$t");
+			temp_r += int2str(t_reg_index);
+			t_reg_index++;
+			ss << "\taddi " << temp_r << ", $zero , " << data2 << "\n";
+			Rreg = temp_r;
+		}
+		else if(judge_category(data2) == 5){
+			// TODO a_reg
+		}
+		else{
+			// TODO extend mode
+		}
 	}
-	else if(judge_category(data1) == 0){
-		// Pure number
-		string temp_r("$t");
-		temp_r += int2str(t_reg_index);
-		t_reg_index++;
-		ss << "\taddi " << temp_r << ", " << temp_r << ", " << data1 << "\n";
-		Lreg = temp_r;
-	}
-	else if(judge_category(data1) == 5){
-		// TODO a_reg
-	}
-	else{
-		// TODO extend mode
-	}
-	// For Rreg
-	if(judge_category(data2) == 2){
-		// Varaible , (contain array with [])
-		int index = whereVariable(data2); // get mem location 
-		string temp_r("$t");
-		temp_r += int2str(t_reg_index);
-		t_reg_index++;
-		ss << "\taddi $sp , $sp , " << -(index*4) << "\n";
-		ss << "\tlw " << temp_r << ", 0($sp)\n";
-		ss << "\taddi $sp , $sp , " << (index*4) << "\n";
-		Rreg = temp_r;
-	}
-	else if(judge_category(data2) == 0){
-		// Pure number
-		string temp_r("$t");
-		temp_r += int2str(t_reg_index);
-		t_reg_index++;
-		ss << "\taddi " << temp_r << ", " << temp_r << ", " << data2 << "\n";
-		Rreg = temp_r;
-	}
-	else if(judge_category(data2) == 5){
-		// TODO a_reg
-	}
-	else{
-		// TODO extend mode
+	else if(data_type==1){
+		// Input is temp register already
+		Lreg = data1;
+		Rreg = data2;
 	}
 	// ========================================Require another temp register
 	string temp_j("$t");
@@ -883,11 +922,11 @@ string make_while_expr(string OP , string data1, string data2){
 	// Now we have Lreg and Rreg
 	if(OP == "<"){
 		ss << "\tslt " << temp_j << ", " << Lreg << ", " << Rreg << "\n"; // Origin: Lreg < Rreg , if yes , temp_j = 1 ,else temp_j = 0
-		ss << "\tbeq " << temp_j << ", 0 , EndWhile"+int2str(while_tag)+"\n"; // If temp_j == 0 , jump to Else stmt . FIXME , Else tag need to be unique
+		ss << "\tbeq " << temp_j << ", 0 , EndWhile"+int2str(while_tag)+"\n"; // If temp_j == 0 , jump to Else stmt
 	}
 	else if(OP == ">"){
-		ss << "\tslt " << temp_j << ", " << Lreg << ", " << Rreg << "\n"; // Origin: Lreg < Rreg , if yes , temp_j = 1 ,else temp_j = 0
-		ss << "\tbeq " << temp_j << ", 1 , EndWhile"+int2str(while_tag)+"\n"; // If temp_j == 0 , jump to Else stmt . FIXME , Else tag need to be unique
+		ss << "\tslt " << temp_j << ", " << Rreg << ", " << Lreg << "\n"; // Origin: Lreg > Rreg , if yes , temp_j = 1 ,else temp_j = 0
+		ss << "\tbeq " << temp_j << ", 0 , EndWhile"+int2str(while_tag)+"\n"; // If temp_j == 0 , jump to Else stmt
 	}
 	else if(OP == ">="){
 		ss << "\tsub " << temp_j << ", " << Lreg << ", " << Rreg << "\n"; // tempj = Lreg - Rreg
@@ -996,8 +1035,8 @@ string make_if_expr(string OP , string data1, string data2){
 		ss << "\tbeq " << temp_j << ", 0 , Else"+int2str(if_tag)+"\n"; // If temp_j == 0 , jump to Else stmt . FIXME , Else tag need to be unique
 	}
 	else if(OP == ">"){
-		ss << "\tslt " << temp_j << ", " << Lreg << ", " << Rreg << "\n"; // Origin: Lreg < Rreg , if yes , temp_j = 1 ,else temp_j = 0
-		ss << "\tbeq " << temp_j << ", 1 , Else"+int2str(if_tag)+"\n"; // If temp_j == 0 , jump to Else stmt . FIXME , Else tag need to be unique
+		ss << "\tslt " << temp_j << ", " << Rreg << ", " << Lreg << "\n"; // Origin: Lreg < Rreg , if yes , temp_j = 1 ,else temp_j = 0
+		ss << "\tbeq " << temp_j << ", 0 , Else"+int2str(if_tag)+"\n"; // If temp_j == 0 , jump to Else stmt . FIXME , Else tag need to be unique
 	}
 	else if(OP == ">="){
 		ss << "\tsub " << temp_j << ", " << Lreg << ", " << Rreg << "\n"; // tempj = Lreg - Rreg
@@ -1385,10 +1424,54 @@ string dealWithPriority(vector<string> List){
 			if(!Op.empty() && (Data.front()!=current_t_reg)){
 				trans_code2MIPS(Op.front(),data1,current_t_reg,current_t_reg);
 			}
+			else if(Op.empty() && (Data.front()!=current_t_reg)){
+				// When input data has only one data , find out this data and then store into current_t_reg
+				trans_var2MIPS(data1,current_t_reg);
+			}
 		}
 	}
 	_temp_expr += ss.str(); ss.str("");
 	return current_t_reg;
+}
+
+void trans_var2MIPS(string data , string current_register){
+	int t_usage = 0;
+	string reg1;
+	if(judge_category(data) == 2){
+		for(int i = 0 ; i < stack_header ; i++){
+			if(Variable_List[i] == data){
+				reg1 = "$t"+int2str(t_reg_index);
+				t_reg_index++;
+				int index = i*4;
+				// and now load it into temp register
+				ss << "\taddi $sp , $sp , " << -index << "\n"; 
+				ss << "\tlw "<< reg1 << ", 0($sp)\n";
+				ss << "\taddi $sp , $sp , " << index << "\n"; 
+				t_usage++;
+				break;
+			}
+		}
+	}
+	else if(judge_category(data) == 5){
+		for(int i = 0; i < a_reg_index ; i++){
+			if(a_reg[i] == data){
+				reg1 = "$a"+int2str(i);
+				break;
+			}
+		}
+	}
+	else if(judge_category(data)== 0){
+		// Pure number , and then we load it into reg1
+		reg1 = "$t"+int2str(t_reg_index);
+		t_reg_index++;
+		t_usage++;
+		ss << "\taddi "<<reg1 << ", $zero , 0\n";
+		ss << "\taddi "<<reg1 << ", "<<reg1<<" , "<< data << "\n";
+	}
+	// ===============================  Do the assignment
+	
+	ss << "\taddi " << current_register << " , " << reg1 << ", 0\n"; 
+	t_reg_index -= t_usage;
 }
 
 void trans_code2MIPS(string OP,string Data1,string Data2 ,string current_register){
