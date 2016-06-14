@@ -456,20 +456,17 @@ stmt: SEMICOLON {
 		/* Need to find out the scope , and then branch out of it */
 		// Consider that the only 1 for-loop in this c-like language , so we only need to do "While" 
 		// Directly jump to EndWhile tag
-		_temp += "\tj EndWhile" + int2str(while_tag) + "\n";
-		*$$ = "";	
+		string str;
+		str = "\tj EndWhile" + int2str(while_tag) + "\n";
+		_temp += str;
+		*$$ = str;
 	}
 	| IF LEFT_PARENTHESE expr RIGHT_PARENTHESE stmt ELSE stmt { 
-		//cout << *$5 << endl;
-		//cout << *$7 << endl;
-		//cout << "Currently : \n" << _temp << endl;
 		/* Do if-else clause*/ 
 		size_t if_stmt = _temp.find(*$5);
 		size_t else_stmt = _temp.find(*$7);
 		int if_stmt_sz = $5->size();
 		int else_stmt_sz = $7->size();
-		//cout << "Currently if_stmt_loc : " << if_stmt << ", if_stmt_size: " << if_stmt_sz << endl;
-		//cout << "Currently else_stmt_loc : " << else_stmt << ", else_stmt_size: " << else_stmt_sz << endl;
 		if_else_toMIPS(if_stmt,else_stmt,if_stmt_sz,else_stmt_sz,*$3);
 		if_tag++;
 	}
@@ -917,7 +914,7 @@ string make_while_expr(string OP , string data1, string data2 , int data_type){
 			string temp_r("$t");
 			temp_r += int2str(t_reg_index);
 			t_reg_index++;
-			ss << "\taddi " << temp_r << ", " << temp_r << ", " << data1 << "\n";
+			ss << "\taddi " << temp_r << ", $zero , " << data1 << "\n";
 			Lreg = temp_r;
 		}
 		else if(judge_category(data1) == 5){
@@ -1033,7 +1030,7 @@ string make_if_expr(string OP , string data1, string data2 , int data_type){
 			string temp_r("$t");
 			temp_r += int2str(t_reg_index);
 			t_reg_index++;
-			ss << "\taddi " << temp_r << ", " << temp_r << ", " << data1 << "\n";
+			ss << "\taddi " << temp_r << ", $zero , " << data1 << "\n";
 			Lreg = temp_r;
 		}
 		else if(judge_category(data1) == 5){
@@ -1059,7 +1056,7 @@ string make_if_expr(string OP , string data1, string data2 , int data_type){
 			string temp_r("$t");
 			temp_r += int2str(t_reg_index);
 			t_reg_index++;
-			ss << "\taddi " << temp_r << ", " << temp_r << ", " << data2 << "\n";
+			ss << "\taddi " << temp_r << ", $zero , " << data2 << "\n";
 			Rreg = temp_r;
 		}
 		else if(judge_category(data2) == 5){
