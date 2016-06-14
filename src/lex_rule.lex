@@ -14,7 +14,7 @@ identifier [i][d][A-Z][a-z]*
 [ ]*int[ ]+ { return INT; }
 [ ]*char[ ]+ { return CHAR;}
 
-[/][/][ a-zA-Z0-9_\/+]* { printf("<comment> : %s\n",yytext); /* But don't need to output anything */}
+[/][/][ a-zA-Z0-9_\/+=;]* { printf("<comment> : %s\n",yytext); /* But don't need to output anything */}
 [\n] { 
 	printf("<now in Line : %d > \n",yylineno);
 	// Record and Increase for the line number

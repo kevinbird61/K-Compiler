@@ -32,7 +32,7 @@ void if_else_toMIPS(size_t if_stmt_loc , size_t else_stmt_loc , int if_stmt_size
 // Do the while expr's translation
 void while_toMIPS(size_t while_stmt_loc , int while_stmt_size , string while_expr);
 // Doing the if's expr , and return the MIPS code in string , which the caller has this usage to concate in the final output
-string make_if_expr(string OP , string data1, string data2);
+string make_if_expr(string OP , string data1, string data2 , int data_type);
 // Doing the while's expr , and return the MIPS code in string , which the caller has this usage to concate in the final output
 string make_while_expr(string OP , string data1, string data2 , int data_type);
 // Make the int to string 
@@ -63,6 +63,8 @@ int stack_tailer = 0; // Record the current started location
 int while_tag = 0;
 int if_tag = 0;
 int un_tag = 0;
+int print_tag = 0;
+int read_tag = 0;
 %}
 
 %code requires {
@@ -458,11 +460,16 @@ stmt: SEMICOLON {
 		*$$ = "";	
 	}
 	| IF LEFT_PARENTHESE expr RIGHT_PARENTHESE stmt ELSE stmt { 
+		//cout << *$5 << endl;
+		//cout << *$7 << endl;
+		//cout << "Currently : \n" << _temp << endl;
 		/* Do if-else clause*/ 
 		size_t if_stmt = _temp.find(*$5);
 		size_t else_stmt = _temp.find(*$7);
 		int if_stmt_sz = $5->size();
 		int else_stmt_sz = $7->size();
+		//cout << "Currently if_stmt_loc : " << if_stmt << ", if_stmt_size: " << if_stmt_sz << endl;
+		//cout << "Currently else_stmt_loc : " << else_stmt << ", else_stmt_size: " << else_stmt_sz << endl;
 		if_else_toMIPS(if_stmt,else_stmt,if_stmt_sz,else_stmt_sz,*$3);
 		if_tag++;
 	}
@@ -495,7 +502,7 @@ stmt: SEMICOLON {
 				if(array == Variable_List[i]){
 					if(Variable_List_type[i] == "INT"){
 						// Print it 
-						ss << "\t#For print " << array << "\n";
+						ss << "\t#For print_" << int2str(print_tag) << array << "\n";
 						ss << "\taddi " << temp_r << ", $zero , 0\n";
 						ss << "\taddi $sp , $sp , " << -(i*4) << "\n";
 						ss << "\tlw " << temp_r << ", 0($sp)\n";
@@ -506,10 +513,11 @@ stmt: SEMICOLON {
 						// And then change array's name
 						arr_index++;
 						array = *$2 + "[" + int2str(arr_index) + "]";
+						print_tag++;
 					}
 					else if(Variable_List_type[i] == "CHAR"){
 						// Print it 
-						ss << "\t#For print " << array << "\n";
+						ss << "\t#For print_"<< int2str(print_tag) << array << "\n";
 						ss << "\taddi " << temp_r << ", $zero , 0\n";
 						ss << "\taddi $sp , $sp , " << -(i*4) << "\n";
 						ss << "\tlw " << temp_r << ", 0($sp)\n";
@@ -520,6 +528,7 @@ stmt: SEMICOLON {
 						// And then change array's name
 						arr_index++;
 						array = *$2 + "[" + int2str(arr_index) + "]";
+						print_tag++;
 					}
 				}
 			}
@@ -534,7 +543,7 @@ stmt: SEMICOLON {
 				}
 			}
 			if(Variable_List_type[index] == "INT"){
-				ss << "\t#For print " << *$2 << "\n";
+				ss << "\t#For print_" << int2str(print_tag) << *$2 << "\n";
 				ss << "\taddi " << temp_r << ", $zero , 0\n";
 				ss << "\taddi $sp , $sp , " << -(index*4) << "\n";
 				ss << "\tlw " << temp_r << ", 0($sp)\n";
@@ -544,7 +553,7 @@ stmt: SEMICOLON {
 				ss << "\tsyscall\n"; 
 			}
 			else if(Variable_List_type[index] == "CHAR"){
-				ss << "\t#For print " << *$2 << "\n";
+				ss << "\t#For print_" << int2str(print_tag) << *$2 << "\n";
 				ss << "\taddi " << temp_r << ", $zero , 0\n";
 				ss << "\taddi $sp , $sp , " << -(index*4) << "\n";
 				ss << "\tlw " << temp_r << ", 0($sp)\n";
@@ -553,6 +562,7 @@ stmt: SEMICOLON {
 				ss << "\tmove $a0, " << temp_r << "\n";
 				ss << "\tsyscall\n";
 			}
+			print_tag++;
 		}
 		// FIXME : print for char 
 		string forprint("");
@@ -577,7 +587,7 @@ stmt: SEMICOLON {
 			for(int i = 0; i < stack_header ; i++){
 				if(array == Variable_List[i]){
 					// Read it 
-					ss << "\t#For read " << array << "\n";
+					ss << "\t#For read_" << int2str(read_tag) << array << "\n";
 					ss << "\tli $v0 , 5\n";
 					ss << "\tsyscall\n";
 					ss << "\taddi $sp , $sp , " << -(i*4) << "\n";
@@ -586,6 +596,7 @@ stmt: SEMICOLON {
 					// And then change array's name
 					arr_index++;
 					array = *$2 + "[" + int2str(arr_index) + "]";
+					read_tag++;
 				}
 			}
 		}
@@ -598,12 +609,13 @@ stmt: SEMICOLON {
 					break;
 				}
 			}
-			ss << "\t#For read " << *$2 << "\n";
+			ss << "\t#For read_" << int2str(read_tag) << *$2 << "\n";
 			ss << "\tli $v0 , 5\n";
 			ss << "\tsyscall\n";
 			ss << "\taddi $sp , $sp , " << -(index*4) << "\n";
 			ss << "\tsw  $v0, 0($sp)\n";
 			ss << "\taddi $sp , $sp , " << (index*4) << "\n";
+			read_tag++;
 		}
 		string forread("");
 		forread = ss.str(); ss.str("");
@@ -667,7 +679,8 @@ expr: unaryOp expr {
 	| NUM expr_D { 
 		ss << $1;
 		$$ = new string(ss.str()); ss.str("");
-		*$$ += *$2;
+		if($2->length() != 0)
+			*$$ += ","+*$2;
 	}
 	| LEFT_PARENTHESE expr RIGHT_PARENTHESE expr_D {
 		// base on expr_D , do the () OP NUM => With parenthese's help , do the priority
@@ -795,6 +808,7 @@ void while_toMIPS(size_t while_stmt_loc , int while_stmt_size , string while_exp
 		string L_expr = Lexpr.front();
 		Lexpr.erase(Lexpr.begin());
 		string R_expr = Rexpr.front();
+		Rexpr.erase(Rexpr.begin());
 		for_WHILEexpr = make_while_expr(main_op , L_expr , R_expr , 0);
 		// Has been tested , ok
 	}
@@ -820,30 +834,59 @@ void if_else_toMIPS(size_t if_stmt_loc , size_t else_stmt_loc , int if_stmt_size
 	// First , we need to judge whether if_expr is
 	// FIXME : make here more robust , here now only  a (>= , <= , < , > ) b , Extend to (expr) (> , < , <= , >=) (expr)
 	stringstream st(if_expr);
-	vector<string> Data;
-	vector<string> Op;
+	string main_op;
+	vector<string> Lexpr;
+	vector<string> Rexpr;
 	string token,for_IFexpr;
+	int flag = 0;
 	// Split out the expr 
 	while(getline(st, token , ',')){
 		if(judge_category(token) == 1){
-			Op.push_back(token);
+			if(flag == 2 || flag == 0){
+				main_op = token;
+				flag = 3;
+			}
+			else if(flag == 1){
+				Lexpr.push_back(token);
+			}
+			else if(flag == 3){
+				Rexpr.push_back(token);
+			}
 		}
 		else if(judge_category(token) == 2 || judge_category(token) == 5 || judge_category(token) == 0){
-			Data.push_back(token);
+			if(flag == 1 || flag == 0)
+				Lexpr.push_back(token);
+			else if(flag == 3)
+				Rexpr.push_back(token); // when flag == 3
+		}
+		else if(token == "("){
+			// Check currently stack  
+			if(flag == 0)
+				flag = 1;
+			else 
+				flag = 3;
+		}
+		else if(token == ")"){
+			flag = 2;
 		}
 	}
 	// And then make the if-exper
-	if(Data.size() == 2){
+	if(Lexpr.size() == 1 && Rexpr.size() == 1){
 		// For a Op b condition
-		string op = Op.front();
-		string L_expr = Data.front();
-		Data.erase(Data.begin());
-		string R_expr = Data.front();
-		for_IFexpr = make_if_expr(op , L_expr , R_expr);
+		string L_expr = Lexpr.front();
+		Lexpr.erase(Lexpr.begin());
+		string R_expr = Rexpr.front();
+		Rexpr.erase(Rexpr.begin());
+		for_IFexpr = make_if_expr(main_op , L_expr , R_expr , 0);
 		// Has been tested , ok
 	}
 	else{
-		// TODO Extend condition ( with more than 2 expr on both side)
+		// Extend condition ( with more than 2 expr on both side)
+		string cur_left_reg = dealWithPriority(Lexpr);
+		string cur_right_reg = dealWithPriority(Rexpr);
+		for_IFexpr = make_if_expr(main_op , cur_left_reg , cur_right_reg , 1);
+		for_IFexpr = _temp_expr + for_IFexpr;
+		_temp_expr = "";
 	}
 	// Now we need to insert or condition into _temp (Consider the order and the index , we insert from back to former)
 	// Step 1 , insert Endif
@@ -970,61 +1013,66 @@ string make_while_expr(string OP , string data1, string data2 , int data_type){
 	return result;
 }
 
-string make_if_expr(string OP , string data1, string data2){
+string make_if_expr(string OP , string data1, string data2 , int data_type){
 	// Transfer data1 and data2 to register mode
 	string Lreg , Rreg;
-	if(judge_category(data1) == 2){
-		// Varaible , (contain array with [])
-		int index = whereVariable(data1); // get mem location 
-		string temp_r("$t");
-		temp_r += int2str(t_reg_index);
-		t_reg_index++;
-		ss << "\taddi $sp , $sp , " << -(index*4) << "\n";
-		ss << "\tlw " << temp_r << ", 0($sp)\n";
-		ss << "\taddi $sp , $sp , " << (index*4) << "\n";
-		Lreg = temp_r;
+	if(data_type == 0){
+		if(judge_category(data1) == 2){
+			// Varaible , (contain array with [])
+			int index = whereVariable(data1); // get mem location 
+			string temp_r("$t");
+			temp_r += int2str(t_reg_index);
+			t_reg_index++;
+			ss << "\taddi $sp , $sp , " << -(index*4) << "\n";
+			ss << "\tlw " << temp_r << ", 0($sp)\n";
+			ss << "\taddi $sp , $sp , " << (index*4) << "\n";
+			Lreg = temp_r;
+		}
+		else if(judge_category(data1) == 0){
+			// Pure number
+			string temp_r("$t");
+			temp_r += int2str(t_reg_index);
+			t_reg_index++;
+			ss << "\taddi " << temp_r << ", " << temp_r << ", " << data1 << "\n";
+			Lreg = temp_r;
+		}
+		else if(judge_category(data1) == 5){
+			// TODO a_reg
+		}
+		else{
+			// TODO extend mode
+		}
+		// For Rreg
+		if(judge_category(data2) == 2){
+			// Varaible , (contain array with [])
+			int index = whereVariable(data2); // get mem location 
+			string temp_r("$t");
+			temp_r += int2str(t_reg_index);
+			t_reg_index++;
+			ss << "\taddi $sp , $sp , " << -(index*4) << "\n";
+			ss << "\tlw " << temp_r << ", 0($sp)\n";
+			ss << "\taddi $sp , $sp , " << (index*4) << "\n";
+			Rreg = temp_r;
+		}
+		else if(judge_category(data2) == 0){
+			// Pure number
+			string temp_r("$t");
+			temp_r += int2str(t_reg_index);
+			t_reg_index++;
+			ss << "\taddi " << temp_r << ", " << temp_r << ", " << data2 << "\n";
+			Rreg = temp_r;
+		}
+		else if(judge_category(data2) == 5){
+			// TODO , if expr is a_reg
+		}
+		else{
+			// TODO extend mode (expr with another expr condition)
+		}
 	}
-	else if(judge_category(data1) == 0){
-		// Pure number
-		string temp_r("$t");
-		temp_r += int2str(t_reg_index);
-		t_reg_index++;
-		ss << "\taddi " << temp_r << ", " << temp_r << ", " << data1 << "\n";
-		Lreg = temp_r;
+	else if(data_type == 1){
+		Lreg = data1;
+		Rreg = data2;
 	}
-	else if(judge_category(data1) == 5){
-		// TODO a_reg
-	}
-	else{
-		// TODO extend mode
-	}
-	// For Rreg
-	if(judge_category(data2) == 2){
-		// Varaible , (contain array with [])
-		int index = whereVariable(data2); // get mem location 
-		string temp_r("$t");
-		temp_r += int2str(t_reg_index);
-		t_reg_index++;
-		ss << "\taddi $sp , $sp , " << -(index*4) << "\n";
-		ss << "\tlw " << temp_r << ", 0($sp)\n";
-		ss << "\taddi $sp , $sp , " << (index*4) << "\n";
-		Rreg = temp_r;
-	}
-	else if(judge_category(data2) == 0){
-		// Pure number
-		string temp_r("$t");
-		temp_r += int2str(t_reg_index);
-		t_reg_index++;
-		ss << "\taddi " << temp_r << ", " << temp_r << ", " << data2 << "\n";
-		Rreg = temp_r;
-	}
-	else if(judge_category(data2) == 5){
-		// TODO , if expr is a_reg
-	}
-	else{
-		// TODO extend mode (expr with another expr condition)
-	}
-	
 	// ==================================== Require another temp register , do the translate
 	string temp_j("$t");
 	temp_j += int2str(t_reg_index);
@@ -1212,10 +1260,14 @@ void dealing_Expr(){
 						Op_stack.push_back(*i);
 					}
 					else if(Op_change_flag == 1){
+						// Pop out the last one 
+						string last_data = Data_stack.back();
+						Data_stack.erase(Data_stack.end());
 						// Reverse all stack
 						reverse(Op_stack.begin(),Op_stack.end());
 						reverse(Data_stack.begin(),Data_stack.end());
 						// And then add *i in Op
+						Data_stack.push_back(last_data);
 						Op_stack.push_back(*i);
 						reverse_flag = !reverse_flag;
 						Op_change_flag = 0;
@@ -1296,14 +1348,16 @@ void dealing_Expr(){
 					Op_stack.erase(Op_stack.begin());
 				}
 				else if(reverse_flag ==1){
-					if(Op_stack.front() == "-" || Op_stack.front() == "/"){
+					/*if(Op_stack.front() == "-" || Op_stack.front() == "/"){
 						trans_code2MIPS(Op_stack.front(),data2,data1,L_reg);
 						Op_stack.erase(Op_stack.begin());
 					}
 					else{
 						trans_code2MIPS(Op_stack.front(),data1,data2,L_reg);
 						Op_stack.erase(Op_stack.begin());
-					}
+					}*/
+					trans_code2MIPS(Op_stack.front(),data1,data2,L_reg);
+					Op_stack.erase(Op_stack.begin());
 				}
 			Data_stack.insert(Data_stack.begin(),L_reg);
 			}
@@ -1361,11 +1415,14 @@ string dealWithPriority(vector<string> List){
 				string in_top = Op.back();
 				int jud = judgeOp(*i,in_top);
 				if(jud == 0 || jud == 3){
+					// Pop out the last one 
+					string last_data = Data.back();
+					Data.erase(Data.end());
 					// No need to do anything , push *i ( which 0 declare as don't care)
-					Op.push_back(*i);
 					reverse(Op.begin(),Op.end());
 					reverse(Data.begin(),Data.end());
 					// And then add *i in Op
+					Data.push_back(last_data);
 					Op.push_back(*i);
 					reverse_flag = !reverse_flag;
 					Op_flag = 0;
@@ -1406,14 +1463,16 @@ string dealWithPriority(vector<string> List){
 					Op.erase(Op.begin());
 				}
 				else if(reverse_flag ==1){
-					if(Op.front() == "-" || Op.front() == "/"){
+					/*if(Op.front() == "-" || Op.front() == "/"){
 						trans_code2MIPS(Op.front(),data2,data1,current_t_reg);
 						Op.erase(Op.begin());
 					}
 					else{
 						trans_code2MIPS(Op.front(),data1,data2,current_t_reg);
 						Op.erase(Op.begin());
-					}
+					}*/
+					trans_code2MIPS(Op.front(),data1,data2,current_t_reg);
+					Op.erase(Op.begin());
 				}
 				Data.insert(Data.begin(),current_t_reg);
 			}
