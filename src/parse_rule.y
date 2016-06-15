@@ -177,19 +177,30 @@ declList: /*empty*/ {}
 declList_D: type ID decl { 
 		if($3.type==0)
 		{
-			/* TODO Global Variable define */
-			if($1==1)
+			/* FIXME Global Variable define 
+				Change to the stack storage to .data 
+				But this need a quite reconstruction on expr manipulation
+			*/
+			if($1==1){
 				cout << "Variable: Get type with Int  , And ID is " << *$2 << endl; /* Because $2 is address */
-			else
+				push_stack(0,*$2,1,0);
+			}
+			else{
 				cout << "Variable: Get type with Char , And ID is " << *$2 << endl;
+				push_stack(0,*$2,1,1);
+			}
 		}
 		else if($3.type==1)
 		{
 			/* TODO Global Array define */
-			if($1==1)
+			if($1==1){
 				cout << "Variable: Get type with Int  , And array name is " << *$2 << ", with Size :" << $3.size << endl; 
-			else
+				push_stack(1,*$2,$3.size,0);
+			}
+			else{
 				cout << "Variable: Get type with Char , And array name is " << *$2 << ", with Size :" << $3.size << endl;
+				push_stack(1,*$2,$3.size,1);
+			}
 		}
 		else
 		{
@@ -207,7 +218,7 @@ declList_D: type ID decl {
 					ss << *$2 <<":\n";
 					function_list.push_back(*$2);
 					// Require a temp register to store 
-					_text = ss.str() + _temp+ "\tbeq $ra , $zero , main\n\tjr $ra\n"; // For return value and function name declaration
+					_text += ss.str() + _temp+ "\tbeq $ra , $zero , main\n\tjr $ra\n"; // For return value and function name declaration
 					ss.str("");
 					_temp = "";
 				}
@@ -221,7 +232,7 @@ declList_D: type ID decl {
 				else{
 					cout << "Function: Get type with Int , And function name is " << *$2 << endl;
 					ss << *$2 <<":\n";
-					_text = ss.str() + _temp + "\tjr $ra\n"; // For return value and function name declaration
+					_text += ss.str() + _temp + "\tjr $ra\n"; // For return value and function name declaration
 					function_list.push_back(*$2);
 					_temp = "";
 					ss.str("");
