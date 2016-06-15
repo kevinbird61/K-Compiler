@@ -61,6 +61,7 @@ int a_reg_index = 0;
 int t_reg_index = 0;
 int stack_header = 1; // Record the current usage location
 int stack_tailer = 0; // Record the current started location
+int stack_global = 1;
 int while_tag = 0;
 int if_tag = 0;
 int un_tag = 0;
@@ -184,10 +185,12 @@ declList_D: type ID decl {
 			if($1==1){
 				//cout << "Variable: Get type with Int  , And ID is " << *$2 << endl; /* Because $2 is address */
 				push_stack(0,*$2,1,0);
+				stack_global++;
 			}
 			else{
 				//cout << "Variable: Get type with Char , And ID is " << *$2 << endl;
 				push_stack(0,*$2,1,1);
+				stack_global++;
 			}
 		}
 		else if($3.type==1)
@@ -199,10 +202,12 @@ declList_D: type ID decl {
 			if($1==1){
 				//cout << "Variable: Get type with Int  , And array name is " << *$2 << ", with Size :" << $3.size << endl; 
 				push_stack(1,*$2,$3.size,0);
+				stack_global += $3.size;
 			}
 			else{
 				//cout << "Variable: Get type with Char , And array name is " << *$2 << ", with Size :" << $3.size << endl;
 				push_stack(1,*$2,$3.size,1);
+				stack_global += $3.size;
 			}
 		}
 		else
@@ -1194,6 +1199,14 @@ void dealing_Expr(){
 		// cout << "+++++ Found in Variable_List (Arr): " << L_str << endl;
 	}
 	else{
+		// Check if it is Global 
+		for(int k = 1 ; k < stack_global ; k++){
+			if(Variable_List[k] == Lvalue_list[0]){
+				flag = 2;
+				store_index = k;
+				break;
+			}
+		}
 		// Check out if it is a Variable
 		for(int k = stack_tailer ; k < stack_header ; k++){
 			if(Variable_List[k] == Lvalue_list[0]){
@@ -1337,6 +1350,10 @@ void dealing_Expr(){
 		}
 		else if(judge == 2 || judge == 0){
 			// Variable (2) or Pure Number(0) or a_reg(5), Push into Data stack
+			if((judge == 2) && whereVariable(*i) == -1){
+				cout << "Error , not found this variable : " << *i << " in this scope" << endl;
+				exit(1);
+			}
 			Data_stack.push_back(*i);
 		}
 		else if(judge == 5){
@@ -1453,6 +1470,10 @@ string dealWithPriority(vector<string> List){
 		/* Here is in the ( ... ) , I simply do only pure number and variable here , and without nested structure*/
 		if(judge == 2 || judge == 0){
 			// Variable , push in Data
+			if((judge == 2) && whereVariable(*i) == -1){
+				cout << "Error , not found this variable : " << *i << " in this scope" << endl;
+				exit(1);
+			}
 			Data.push_back(*i);
 		}
 		else if(judge == 1){
@@ -1820,6 +1841,12 @@ int whereVariable(string ID){
 		if(Variable_List[i] == ID && Variable_List[i].size() > 0)
 			return i;
 	}
+	// Search if it is in Global
+	for(int i = 1 ; i < stack_global ; i++){
+		if(Variable_List[i] == ID)
+			return i;
+	}
+	
 	return -1;
 }
 
