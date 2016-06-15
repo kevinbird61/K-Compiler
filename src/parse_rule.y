@@ -48,6 +48,7 @@ string _data = "";
 string _text = "";
 string _temp = "";
 string _temp_expr = "";
+string _temp_conidtion = "";
 string *Variable_List = new string[100]; // Record the ID and it's stack location
 string *Variable_List_type = new string[100]; // Record the ID's type 
 vector<string> function_list;// Record the function name we defined
@@ -158,20 +159,19 @@ int read_tag = 0;
 
 %%
 Program: declList {
-		cout << "Get In the main Program" << endl; 
+		cout << "Parse Successful!!" << endl; 
 		// Open File for assembly
 		assemFile.open("run_compile.s");
 		// At the end 
-		assemFile << "\t.data\n" << _data << "\t.text\n\t.globl main\n" << _text;	
-		
-		for(int i = 0 ; i < stack_header ; i++){
+		assemFile << "\t.data\n" << _data << "\t.text\n\t.globl main\n" << _text << "\n\tli	$v0 , 10\n\tsyscall\n";	
+		/*for(int i = 0 ; i < stack_header ; i++){
 			cout << Variable_List[i] << endl;
-		}
+		}*/
 	}
 	;
 	
 declList: /*empty*/ {}
-	| declList_D declList { cout<< "Get Declaration" << endl;}
+	| declList_D declList { /*cout<< "Get Declaration" << endl;*/}
 	;
 	
 declList_D: type ID decl { 
@@ -182,11 +182,11 @@ declList_D: type ID decl {
 				But this need a quite reconstruction on expr manipulation
 			*/
 			if($1==1){
-				cout << "Variable: Get type with Int  , And ID is " << *$2 << endl; /* Because $2 is address */
+				//cout << "Variable: Get type with Int  , And ID is " << *$2 << endl; /* Because $2 is address */
 				push_stack(0,*$2,1,0);
 			}
 			else{
-				cout << "Variable: Get type with Char , And ID is " << *$2 << endl;
+				//cout << "Variable: Get type with Char , And ID is " << *$2 << endl;
 				push_stack(0,*$2,1,1);
 			}
 		}
@@ -194,11 +194,11 @@ declList_D: type ID decl {
 		{
 			/* TODO Global Array define */
 			if($1==1){
-				cout << "Variable: Get type with Int  , And array name is " << *$2 << ", with Size :" << $3.size << endl; 
+				//cout << "Variable: Get type with Int  , And array name is " << *$2 << ", with Size :" << $3.size << endl; 
 				push_stack(1,*$2,$3.size,0);
 			}
 			else{
-				cout << "Variable: Get type with Char , And array name is " << *$2 << ", with Size :" << $3.size << endl;
+				//cout << "Variable: Get type with Char , And array name is " << *$2 << ", with Size :" << $3.size << endl;
 				push_stack(1,*$2,$3.size,1);
 			}
 		}
@@ -207,14 +207,14 @@ declList_D: type ID decl {
 			/* Function */
 			if($1==1)
 				if(*$2 == "idMain"){
-					cout << "Get Main function (Int): " << *$2 << endl; 
+					//cout << "Get Main function (Int): " << *$2 << endl; 
 					ss << "main:\n";
 					_text = _text + ss.str() + _temp;
 					ss.str("");
 					_temp = "";
 				}
 				else{
-					cout << "Function: Get type with Int , And function name is " << *$2 << endl;
+					//cout << "Function: Get type with Int , And function name is " << *$2 << endl;
 					ss << *$2 <<":\n";
 					function_list.push_back(*$2);
 					// Require a temp register to store 
@@ -224,13 +224,13 @@ declList_D: type ID decl {
 				}
 			else // Char
 				if(*$2 == "idMain"){
-					cout << "Get Main function (Int): " << *$2 << endl; 
+					//cout << "Get Main function (Int): " << *$2 << endl; 
 					ss << "main:\n";
 					_text = _text+ss.str()+_temp;
 					ss.str("");
 				}
 				else{
-					cout << "Function: Get type with Int , And function name is " << *$2 << endl;
+					//cout << "Function: Get type with Int , And function name is " << *$2 << endl;
 					ss << *$2 <<":\n";
 					_text += ss.str() + _temp + "\tjr $ra\n"; // For return value and function name declaration
 					function_list.push_back(*$2);
@@ -264,7 +264,7 @@ paramDecl: type ID paramDecl_D {
 		if($3.type==0){
 			// variable
 			if($1 == 1){ 
-				cout << "Function Parameter (variable) with Type INT , ID : " << *$2 << endl;
+				//cout << "Function Parameter (variable) with Type INT , ID : " << *$2 << endl;
 				ss << "\t#" << "$a" << a_reg_index << " has be occupied with (INT) :" << *$2<<"\n" ;
 				a_reg[a_reg_index] = *$2;
 				_temp += ss.str(); 
@@ -272,7 +272,7 @@ paramDecl: type ID paramDecl_D {
 				a_reg_index++;
 			}
 			else{ 
-				cout << "Function Parameter (variable) with Type CHAR , ID : " << *$2 << endl;
+				//cout << "Function Parameter (variable) with Type CHAR , ID : " << *$2 << endl;
 				ss << "\t#" << "$a" << a_reg_index << " has be occupied with (CHAR) :" << *$2<<"\n" ;
 				a_reg[a_reg_index] = *$2;
 				_temp += ss.str(); 
@@ -283,7 +283,7 @@ paramDecl: type ID paramDecl_D {
 		else{
 			// array
 			if($1 == 1){ 
-				cout << "Function Parameter (array) with Type INT , ID : " << *$2 << endl;
+				//cout << "Function Parameter (array) with Type INT , ID : " << *$2 << endl;
 				ss << "\t#" << "$a" << a_reg_index << " has be occupied with Array(Int) :" << *$2<<"\n" ;
 				a_reg[a_reg_index] = *$2;
 				_temp += ss.str(); 
@@ -291,7 +291,7 @@ paramDecl: type ID paramDecl_D {
 				a_reg_index++;
 			}
 			else{ 
-				cout << "Function Parameter (array) with Type CHAR , ID : " << *$2 << endl;
+				//cout << "Function Parameter (array) with Type CHAR , ID : " << *$2 << endl;
 				ss << "\t#" << "$a" << a_reg_index << " has be occupied with Array(CHAR) :" << *$2<<"\n" ;
 				a_reg[a_reg_index] = *$2;
 				_temp += ss.str(); 
@@ -302,9 +302,11 @@ paramDecl: type ID paramDecl_D {
 	}
 	;
 
-paramDeclListTail_D: /* empty */ { cout << "Complete parameter define" << endl; }
+paramDeclListTail_D: /* empty */ { 
+		//cout << "Complete parameter define" << endl; 
+	}
 	| DOT paramDeclListTail { 
-		cout << "Prepare to define next variable" << endl; 
+		//cout << "Prepare to define next variable" << endl; 
 	}
 	;
 	
@@ -327,11 +329,11 @@ varDecl: type ID varDecl_D {
 		{
 			/* Variable define */
 			if($1==1){
-				cout << "Variable: Get type with Int  , And ID is " << *$2 << endl; /* Because $2 is address */
+				//cout << "Variable: Get type with Int  , And ID is " << *$2 << endl; /* Because $2 is address */
 				push_stack(0,*$2,1,0);
 			}
 			else{
-				cout << "Variable: Get type with Char , And ID is " << *$2 << endl;
+				//cout << "Variable: Get type with Char , And ID is " << *$2 << endl;
 				push_stack(0,*$2,1,1);
 			}
 		}
@@ -339,12 +341,12 @@ varDecl: type ID varDecl_D {
 		{
 			/* Array define */
 			if($1==1){
-				cout << "Variable: Get type with Int  , And array name is " << *$2 << ", with Size :" << $3.size << endl; /* Because $2 is address */
+				//cout << "Variable: Get type with Int  , And array name is " << *$2 << ", with Size :" << $3.size << endl; /* Because $2 is address */
 				push_stack(1,*$2,$3.size,0);
 				array_list.push_back(*$2);
 			}
 			else{
-				cout << "Variable: Get type with Char , And array name is " << *$2 << ", with Size :" << $3.size << endl;
+				//cout << "Variable: Get type with Char , And array name is " << *$2 << ", with Size :" << $3.size << endl;
 				push_stack(1,*$2,$3.size,1);
 				array_list.push_back(*$2);
 			}
@@ -353,14 +355,14 @@ varDecl: type ID varDecl_D {
 	;
 
 varDecl_D: SEMICOLON { 
-		cout << "Get variable assignment" << endl;  
+		//cout << "Get variable assignment" << endl;  
 		$$.type = 0;
 		$$.size = 1;
 	}
 	| LEFT_BUCKET NUM RIGHT_BUCKET SEMICOLON {
 	if($2 > 0)
 	{
-		cout << "Get Array assignment which size is " << $2 << endl;
+		//cout << "Get Array assignment which size is " << $2 << endl;
 		$$.type = 1;
 		$$.size = $2;
 	}
@@ -388,13 +390,13 @@ stmt: SEMICOLON {
 	}
 	| expr SEMICOLON { 
 		// Record the arithmetic expr in $1
-		cout << "=====================List out expr:" << *$1 << endl;
+		//cout << "=====================List out expr:" << *$1 << endl;
 		stringstream st(*$1);
 		string token , open;
 		while(getline(st, token , ',')){
 			if(token != "="){
-				open = "Left value:";
-				cout << open << token << endl;
+				//open = "Left value:";
+				//cout << open << token << endl;
 				Lvalue_list.push_back(token);
 			}
 			else{
@@ -403,12 +405,12 @@ stmt: SEMICOLON {
 		}
 		while(getline(st, token , ',')){
 			open = "Right value:";
-			cout << open << token << endl;
+			//cout << open << token << endl;
 			Rvalue_list.push_back(token);
 		}
 		// After that , we can dealing with Lvalue and Rvalue list
-		cout << "size of Lvalue: " << Lvalue_list.size() << endl;
-		cout << "size of Rvalue: " << Rvalue_list.size() << endl;
+		//cout << "size of Lvalue: " << Lvalue_list.size() << endl;
+		//cout << "size of Rvalue: " << Rvalue_list.size() << endl;
 		// Dealing with assignment
 		dealing_Expr();
 		// 
@@ -419,45 +421,48 @@ stmt: SEMICOLON {
 	| RETURN expr SEMICOLON { 
 		/* Return expr */ 
 		// If It is a variable or a pure number , translate to assembly directly.
-		int judge = judge_category(*$2);
-		if(judge == 2){
-			// Variable
-			int index=-1;
-			for(int i = 0 ;i<stack_header ;i++){
-				if(*$2 == Variable_List[i]){
-					index = i;
-					break;
+		//cout << "Print Return : " << *$2 << endl;
+		if($2->length() == 1){
+			int judge = judge_category(*$2);
+			if(judge == 2){
+				// Variable
+				int index=-1;
+				for(int i = 0 ;i<stack_header ;i++){
+					if(*$2 == Variable_List[i]){
+						index = i;
+						break;
+					}
+				}
+				if(index != -1){
+					// accquire temp register to load this memory's value and then 
+					string temp_r("$t");
+					temp_r += int2str(t_reg_index);
+					t_reg_index++;
+					ss << "\taddi $sp , $sp , " << -(index*4) << "\n";
+					ss << "\tlw " << temp_r << ", 0($sp)\n";
+					ss << "\taddi $sp , $sp , " << (index*4) << "\n";
+					ss << "\taddi $v0 , $zero , 0\n"; // Clear the $v0
+					ss << "\tadd $v0, $v0, " << temp_r<<"\n";
+					_temp_expr += ss.str(); ss.str("");
 				}
 			}
-			if(index != -1){
+			else if(judge == 0){
+				// Pure number
 				// accquire temp register to load this memory's value and then 
 				string temp_r("$t");
 				temp_r += int2str(t_reg_index);
 				t_reg_index++;
-				ss << "\taddi $sp , $sp , " << -(index*4) << "\n";
-				ss << "\tlw " << temp_r << ", 0($sp)\n";
-				ss << "\taddi $sp , $sp , " << (index*4) << "\n";
+				ss << "\tlw " << temp_r << ", " << *$2 << "\n";
 				ss << "\taddi $v0 , $zero , 0\n"; // Clear the $v0
-				ss << "\tadd $v0, $v0, " << temp_r<<"\n";
+				ss << "\tadd $v0, $v0, " << temp_r <<"\n";
 				_temp_expr += ss.str(); ss.str("");
 			}
-		}
-		else if(judge == 0){
-			// Pure number
-			// accquire temp register to load this memory's value and then 
-			string temp_r("$t");
-			temp_r += int2str(t_reg_index);
-			t_reg_index++;
-			ss << "\tlw " << temp_r << ", " << *$2 << "\n";
-			ss << "\taddi $v0 , $zero , 0\n"; // Clear the $v0
-			ss << "\tadd $v0, $v0, " << temp_r <<"\n";
-			_temp_expr += ss.str(); ss.str("");
-		}
-		else if(judge == 3){
-			// TODO array condition (return one variable in array or entire array)
-		}
-		else{
-			// TODO Complex condition - like : return func(a,b) ...
+			else if(judge == 3){
+				// TODO array condition (return one variable in array or entire array)
+			}
+			else{
+				// TODO Complex condition - like : return func(a,b) ...
+			}
 		}
 		*$$ = _temp_expr;
 		_temp += _temp_expr;
@@ -479,20 +484,31 @@ stmt: SEMICOLON {
 		int if_stmt_sz = $5->size();
 		int else_stmt_sz = $7->size();
 		if_else_toMIPS(if_stmt,else_stmt,if_stmt_sz,else_stmt_sz,*$3);
+		// Dealing with return string 
+		size_t if_stmt_after = _temp.find(_temp_conidtion);
+		size_t end_stmt_after = _temp.find("Endif"+int2str(if_tag)+":\n");
+		string if_sub_str = _temp.substr(if_stmt_after,end_stmt_after);
 		if_tag++;
+		*$$ = if_sub_str;
+		_temp_conidtion = "";
 	}
 	| WHILE LEFT_PARENTHESE expr RIGHT_PARENTHESE stmt { 
 		/* Do while clause */ 
 		size_t while_stmt = _temp.find(*$5);
 		int while_stmt_sz = $5->size();
 		while_toMIPS(while_stmt,while_stmt_sz,*$3);
+		// Dealing with return string 
+		size_t while_start = _temp.find("WHILE"+int2str(while_tag)+":\n");
+		size_t while_end = _temp.find("EndWhile"+int2str(while_tag)+":\n");
+		string while_sub_str = _temp.substr(while_start,while_end);
 		while_tag++;
+		*$$ = while_sub_str;
 	}
 	| block { 
 		*$$ = *$1;
 	}
 	| PRINT ID { 
-		cout << "Get print command , print : " << *$2 << endl; 
+		//cout << "Get print command , print : " << *$2 << endl; 
 		// add the print MIPS (Now support print int)
 		string temp_r("$t");
 		temp_r += int2str(t_reg_index);
@@ -572,7 +588,6 @@ stmt: SEMICOLON {
 			}
 			print_tag++;
 		}
-		// FIXME : print for char 
 		string forprint("");
 		forprint = ss.str(); ss.str("");
 		_temp += forprint;
@@ -581,7 +596,7 @@ stmt: SEMICOLON {
 	}
 	| READ ID { 
 		/* Do read command */ 
-		cout << "Get read command , read : " << *$2 << endl; 
+		//cout << "Get read command , read : " << *$2 << endl; 
 		// add the print MIPS (Now support read int)
 		// Step 1 , find out where the ID 
 		int category = judge_category(*$2);
@@ -721,18 +736,18 @@ exprIdTail: expr_D {
 		*$$ = *$1 + *$2 + *$3 + *$4;
 		//cout << "Array usage with index :"<< *$2 << ";And ArrayTail:"<< *$4 << endl;
 	}
-	| B_EQUAL expr {
+	/*| B_EQUAL expr {
 		*$$ = *$1 + *$2;
-	} 
+	} */
 	;
 	
 exprArrayTail: expr_D {
 	// With the condition with expr_D : epsilon or binOp expr 
 		*$$ = ","+*$1;
 	}
-	| B_EQUAL expr {
+	/*| B_EQUAL expr {
 		*$$ = *$1 + *$2;
-	}
+	}*/
 	;
 
 exprList: /* empty */ {} 
@@ -835,12 +850,10 @@ void while_toMIPS(size_t while_stmt_loc , int while_stmt_size , string while_exp
 	_temp.insert(while_stmt_loc + while_stmt_size,"\tj WHILE"+ int2str(while_tag) +"\nEndWhile"+int2str(while_tag)+":\n");
 	// Step 2, insert for_WHILEexpr
 	_temp.insert(while_stmt_loc,"WHILE"+int2str(while_tag)+":\n"+for_WHILEexpr);
-	// Step 3, insert "WHILE:\n" tag
 }
 
 void if_else_toMIPS(size_t if_stmt_loc , size_t else_stmt_loc , int if_stmt_size , int else_stmt_size ,string if_expr){
 	// First , we need to judge whether if_expr is
-	// FIXME : make here more robust , here now only  a (>= , <= , < , > ) b , Extend to (expr) (> , < , <= , >=) (expr)
 	stringstream st(if_expr);
 	string main_op;
 	vector<string> Lexpr;
@@ -903,6 +916,7 @@ void if_else_toMIPS(size_t if_stmt_loc , size_t else_stmt_loc , int if_stmt_size
 	_temp.insert(else_stmt_loc,"\tj Endif"+int2str(if_tag)+"\nElse"+int2str(if_tag)+":\n");
 	// Step 3 , insert for_IFexpr into the start of stmt 
 	_temp.insert(if_stmt_loc,for_IFexpr);
+	_temp_conidtion = for_IFexpr;
 }
 
 string make_while_expr(string OP , string data1, string data2 , int data_type){
@@ -1002,14 +1016,14 @@ string make_while_expr(string OP , string data1, string data2 , int data_type){
 		ss << "goWHILE"+int2str(while_tag)+":\n";
 	}
 	else if(OP == "!="){
-		ss << "\tbne " << Lreg << ", " << Rreg << ", EndWhile"+int2str(while_tag)+"\n";
+		ss << "\tbeq " << Lreg << ", " << Rreg << ", EndWhile"+int2str(while_tag)+"\n";
 	}
 	else if(OP == "=="){
-		ss << "\tbeq " << Lreg << ", " << Rreg << ", EndWhile"+int2str(while_tag)+"\n";
+		ss << "\tbne " << Lreg << ", " << Rreg << ", EndWhile"+int2str(while_tag)+"\n";
 	}
 	else{
 		// Not in condition
-		cout << "Error if expr , with no found " << OP << " in our operator rules" << endl;
+		cout << "Error while expr , with no found " << OP << " in our operator rules" << endl;
 		exit(1);
 	}
 	
@@ -1117,10 +1131,10 @@ string make_if_expr(string OP , string data1, string data2 , int data_type){
 		ss << "goIf"+int2str(if_tag)+":\n";
 	}
 	else if(OP == "!="){
-		ss << "\tbne " << Lreg << ", " << Rreg << ", Else"+int2str(if_tag)+"\n";
+		ss << "\tbeq " << Lreg << ", " << Rreg << ", Else"+int2str(if_tag)+"\n";
 	}
 	else if(OP == "=="){
-		ss << "\tbeq " << Lreg << ", " << Rreg << ", Else"+int2str(if_tag)+"\n";
+		ss << "\tbne " << Lreg << ", " << Rreg << ", Else"+int2str(if_tag)+"\n";
 	}
 	else{
 		// Not in condition
@@ -1157,7 +1171,7 @@ void dealing_Expr(){
 	}
 	if(flag == 1){
 		// Confirm that Lvalue is an Array
-		cout << "+++++ Found in Variable_List (Arr): " << L_str << endl;
+		// cout << "+++++ Found in Variable_List (Arr): " << L_str << endl;
 	}
 	else{
 		// Check out if it is a Variable
@@ -1168,8 +1182,9 @@ void dealing_Expr(){
 				break;
 			}
 		}
-		if(flag == 2)
-			cout << "+++++ Found in Variable_List (Var): " << Lvalue_list[0] << endl;
+		if(flag == 2){
+			//cout << "+++++ Found in Variable_List (Var): " << Lvalue_list[0] << endl;
+		}
 		else{
 			cout << "Error with lvalue , which not existed: " << Lvalue_list[0] << endl;
 			exit(1);
@@ -1179,7 +1194,7 @@ void dealing_Expr(){
 	// And now , we can dealing with Right side
 	int Op_change_flag = 0;
 	for(vector<string>::iterator i = Rvalue_list.begin(); i != Rvalue_list.end() ; i++){
-		cout << "Right value judge: " << judge_category(*i) << endl;
+		//cout << "Right value judge: " << judge_category(*i) << endl;
 		int judge = judge_category(*i);
 		/* TODO : Whether it comes with one data match one OP ? */
 		if(judge == 4){
@@ -1330,11 +1345,11 @@ void dealing_Expr(){
 		reverse_flag = !reverse_flag;
 	}
 	// Debug : pop out all Op and Data stack 
-	cout << "Pop out Data stack : ";
+	/*cout << "Pop out Data stack : ";
 	debugVector(Data_stack);
 	cout << "Pop out OP stack : ";
 	debugVector(Op_stack);
-	cout << "And Now , reverse flag = " << reverse_flag << endl;
+	cout << "And Now , reverse flag = " << reverse_flag << endl;*/
 	// After we have Data_stack and Op_stack , we can do it (remember $tx and $ax and $vx , while $ax is using it's own name)
 	string L_reg("$t");
 	L_reg += int2str(t_reg_index); 
@@ -1385,7 +1400,7 @@ void dealing_Expr(){
 			}
 		}
 	}
-	cout << "~~~~~~~~~~~~~~~~~~~~~~~~~~~~store index = " << store_index << endl;
+	//cout << "~~~~~~~~~~~~~~~~~~~~~~~~~~~~store index = " << store_index << endl;
 	// Assign the L_reg to the Lvalue storage location
 	ss << "\taddi $sp , $sp ," << -(store_index*4)<< "\n";
 	ss << "\tsw " << L_reg << ", 0($sp)\n";
@@ -1465,7 +1480,7 @@ string dealWithPriority(vector<string> List){
 			Data.erase(Data.begin());
 			if(!Op.empty()){
 				// When the Op isn't empty , we need to pop out data to do
-				cout << "OP:" << Op.front() << "; Data1:"<< data1 << "; Data2:" << data2 << "; current_register:" << current_t_reg << endl;
+				//cout << "OP:" << Op.front() << "; Data1:"<< data1 << "; Data2:" << data2 << "; current_register:" << current_t_reg << endl;
 				if(reverse_flag==0){
 					trans_code2MIPS(Op.front(),data1,data2,current_t_reg);
 					Op.erase(Op.begin());
@@ -1536,14 +1551,13 @@ void trans_var2MIPS(string data , string current_register){
 		ss << "\taddi "<<reg1 << ", "<<reg1<<" , "<< data << "\n";
 	}
 	// ===============================  Do the assignment
-	
 	ss << "\taddi " << current_register << " , " << reg1 << ", 0\n"; 
 	t_reg_index -= t_usage;
 }
 
 void trans_code2MIPS(string OP,string Data1,string Data2 ,string current_register){
 	// Debug
-	cout << "OP:" << OP << "; Data1:"<< Data1 << "; Data2:" << Data2 << "; current_register:" << current_register << endl;
+	//cout << "OP:" << OP << "; Data1:"<< Data1 << "; Data2:" << Data2 << "; current_register:" << current_register << endl;
 	// And now we can put it into the assembly code
 	// Transfer the Data1 , and Data2 to stack mode
 	int t_usage = 0;
