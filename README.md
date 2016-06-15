@@ -5,7 +5,12 @@
   - If you're willing , I'm sincerely invite you to join K-compiler.
 
 ## Now Support 
- - You can see in the test file : `src/test.c`
+ - You can see in the test file , which in folder "Test_file"
+ - Several Function definition and function calls : `test_severalFunc.c`
+ - If-condition(Extend mode) : `test_if_condition.c`
+ - While-condition(Extend mode) : `test_condition_expr.c`
+ - Global variable usage : `test_globalVar.c`
+ - Break condition : `test_break.c`
 
 ## PreStart (Environment Setting , on Linux)
  - `sudo apt-get install flex` : to get lex
@@ -53,7 +58,7 @@ Testing the run_compile.s in MIPS.
   - `gcc lex.yy.c -lfl ` + (optional)`-o <output executable file>` : If you don't give the output file name, execute file will be `a.out` .
  - When you want to build K-compiler , using the command:
   - `make` : to make the execute file - `run_compile`
-  - `./run_compile test.c` : translate the test.c to MIPS (run_compile.s)
+  - `./k_compile path/to/testfile` : translate the test.c to MIPS (run_compile.s)
     - Here , you can replace your file with test.c , to make your assembly code.
 
 # Some Supplement
