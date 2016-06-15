@@ -1,5 +1,10 @@
 int idGlobal;
 
+int idTest(int idVar){
+	int idTestvar;
+	idTestvar = 3;
+}
+
 int idMain(){
 	int idLocal;
 	
@@ -7,6 +12,10 @@ int idMain(){
 	idGlobal = 11;
 	
 	idLocal = idLocal + idGlobal;
+	
+	print idLocal;
+	
+	idLocal = idLocal + idTestvar;
 	
 	print idLocal;
 }

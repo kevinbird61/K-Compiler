@@ -11,7 +11,7 @@ int idMain ( ) {
     int idResult ;
     int idLoop;
     int idArray [ 10 ] ;
-
+    
     read idA ;
     read idB ;
 
