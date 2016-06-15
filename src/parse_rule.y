@@ -133,20 +133,20 @@ int read_tag = 0;
 %token <str> INT
 %token <str> CHAR
 /* Define for operators (terminal) */
-%left <int_val> U_NOT
-%left <str> B_ASSIGN
-%left <str> B_OR
-%left <str> B_AND
-%left <str> B_NOT_EQUAL
-%left <str> B_EQUAL
-%left <str> B_NLARGER_THAN
-%left <str> B_NLESS_THAN
-%left <str> B_SMALLER
-%left <str> B_LARGER
-%left <str> B_PLUS
-%left <str> B_MINUS
-%left <str> B_DIVIDE
-%left <str> B_MULT
+%token <int_val> U_NOT
+%token <str> B_ASSIGN
+%token <str> B_OR
+%token <str> B_AND
+%token <str> B_NOT_EQUAL
+%token <str> B_EQUAL
+%token <str> B_NLARGER_THAN
+%token <str> B_NLESS_THAN
+%token <str> B_SMALLER
+%token <str> B_LARGER
+%token <str> B_PLUS
+%token <str> B_MINUS
+%token <str> B_DIVIDE
+%token <str> B_MULT
 /* Define for condition (terminal) */
 %token <str> WHILE
 %token <str> BREAK
@@ -163,7 +163,7 @@ Program: declList {
 		// Open File for assembly
 		assemFile.open("run_compile.s");
 		// At the end 
-		assemFile << "\t.data\n" << _data << "\t.text\n\t.globl main\n" << _text << "\n\tli	$v0 , 10\n\tsyscall\n";	
+		assemFile << "\t.data\n" << _data << "\t.text\n\t.globl main\n" << _text ;//<< "\n\tli	$v0 , 10\n\tsyscall\n";	
 		/*for(int i = 0 ; i < stack_header ; i++){
 			cout << Variable_List[i] << endl;
 		}*/
@@ -192,7 +192,10 @@ declList_D: type ID decl {
 		}
 		else if($3.type==1)
 		{
-			/* TODO Global Array define */
+			/* FIXME Global Array define 
+				Change to the stack storage to .data 
+				But this need a quite reconstruction on expr manipulation
+			*/
 			if($1==1){
 				//cout << "Variable: Get type with Int  , And array name is " << *$2 << ", with Size :" << $3.size << endl; 
 				push_stack(1,*$2,$3.size,0);
@@ -237,6 +240,9 @@ declList_D: type ID decl {
 					_temp = "";
 					ss.str("");
 				}
+			
+			// When come to function , change the stack tailer to stack header
+			stack_tailer = stack_header;
 		}
 	}
 	;
@@ -422,47 +428,45 @@ stmt: SEMICOLON {
 		/* Return expr */ 
 		// If It is a variable or a pure number , translate to assembly directly.
 		//cout << "Print Return : " << *$2 << endl;
-		if($2->length() == 1){
-			int judge = judge_category(*$2);
-			if(judge == 2){
-				// Variable
-				int index=-1;
-				for(int i = 0 ;i<stack_header ;i++){
-					if(*$2 == Variable_List[i]){
-						index = i;
-						break;
-					}
-				}
-				if(index != -1){
-					// accquire temp register to load this memory's value and then 
-					string temp_r("$t");
-					temp_r += int2str(t_reg_index);
-					t_reg_index++;
-					ss << "\taddi $sp , $sp , " << -(index*4) << "\n";
-					ss << "\tlw " << temp_r << ", 0($sp)\n";
-					ss << "\taddi $sp , $sp , " << (index*4) << "\n";
-					ss << "\taddi $v0 , $zero , 0\n"; // Clear the $v0
-					ss << "\tadd $v0, $v0, " << temp_r<<"\n";
-					_temp_expr += ss.str(); ss.str("");
+		int judge = judge_category(*$2);
+		if(judge == 2){
+			// Variable
+			int index=-1;
+			for(int i = 0 ;i<stack_header ;i++){
+				if(*$2 == Variable_List[i]){
+					index = i;
+					break;
 				}
 			}
-			else if(judge == 0){
-				// Pure number
+			if(index != -1){
 				// accquire temp register to load this memory's value and then 
 				string temp_r("$t");
 				temp_r += int2str(t_reg_index);
 				t_reg_index++;
-				ss << "\tlw " << temp_r << ", " << *$2 << "\n";
+				ss << "\taddi $sp , $sp , " << -(index*4) << "\n";
+				ss << "\tlw " << temp_r << ", 0($sp)\n";
+				ss << "\taddi $sp , $sp , " << (index*4) << "\n";
 				ss << "\taddi $v0 , $zero , 0\n"; // Clear the $v0
-				ss << "\tadd $v0, $v0, " << temp_r <<"\n";
+				ss << "\tadd $v0, $v0, " << temp_r<<"\n";
 				_temp_expr += ss.str(); ss.str("");
 			}
-			else if(judge == 3){
-				// TODO array condition (return one variable in array or entire array)
-			}
-			else{
-				// TODO Complex condition - like : return func(a,b) ...
-			}
+		}
+		else if(judge == 0){
+			// Pure number
+			// accquire temp register to load this memory's value and then 
+			string temp_r("$t");
+			temp_r += int2str(t_reg_index);
+			t_reg_index++;
+			ss << "\tlw " << temp_r << ", " << *$2 << "\n";
+			ss << "\taddi $v0 , $zero , 0\n"; // Clear the $v0
+			ss << "\tadd $v0, $v0, " << temp_r <<"\n";
+			_temp_expr += ss.str(); ss.str("");
+		}
+		else if(judge == 3){
+			// TODO array condition (return one variable in array or entire array)
+		}
+		else{
+			// TODO Complex condition - like : return func(a,b) ...
 		}
 		*$$ = _temp_expr;
 		_temp += _temp_expr;
@@ -926,6 +930,10 @@ string make_while_expr(string OP , string data1, string data2 , int data_type){
 		if(judge_category(data1) == 2){
 			// Varaible , (contain array with [])
 			int index = whereVariable(data1); // get mem location 
+			if(index == -1){
+				cout << "Error , not found this variable : " << data1 << " in this scope" << endl;
+				exit(1);
+			}
 			string temp_r("$t");
 			temp_r += int2str(t_reg_index);
 			t_reg_index++;
@@ -952,6 +960,10 @@ string make_while_expr(string OP , string data1, string data2 , int data_type){
 		if(judge_category(data2) == 2){
 			// Varaible , (contain array with [])
 			int index = whereVariable(data2); // get mem location 
+			if(index == -1){
+				cout << "Error , not found this variable : " << data2 << " in this scope" << endl;
+				exit(1);
+			}
 			string temp_r("$t");
 			temp_r += int2str(t_reg_index);
 			t_reg_index++;
@@ -1042,6 +1054,10 @@ string make_if_expr(string OP , string data1, string data2 , int data_type){
 		if(judge_category(data1) == 2){
 			// Varaible , (contain array with [])
 			int index = whereVariable(data1); // get mem location 
+			if(index == -1){
+				cout << "Error , not found this variable : " << data1 << " in this scope" << endl;
+				exit(1);
+			}
 			string temp_r("$t");
 			temp_r += int2str(t_reg_index);
 			t_reg_index++;
@@ -1068,6 +1084,10 @@ string make_if_expr(string OP , string data1, string data2 , int data_type){
 		if(judge_category(data2) == 2){
 			// Varaible , (contain array with [])
 			int index = whereVariable(data2); // get mem location 
+			if(index == -1){
+				cout << "Error , not found this variable : " << data2 << " in this scope" << endl;
+				exit(1);
+			}
 			string temp_r("$t");
 			temp_r += int2str(t_reg_index);
 			t_reg_index++;
@@ -1162,7 +1182,7 @@ void dealing_Expr(){
 			break;
 		}
 	}
-	for(int k = 1; k < stack_header ; k++){
+	for(int k = stack_tailer; k < stack_header ; k++){
 		if(Variable_List[k] == L_str){
 			flag = 1;
 			store_index = k; // For
@@ -1175,7 +1195,7 @@ void dealing_Expr(){
 	}
 	else{
 		// Check out if it is a Variable
-		for(int k = 1 ; k < stack_header ; k++){
+		for(int k = stack_tailer ; k < stack_header ; k++){
 			if(Variable_List[k] == Lvalue_list[0]){
 				flag = 2;
 				store_index = k;
@@ -1217,6 +1237,10 @@ void dealing_Expr(){
 						++k;
 						// Search its stack location
 						int jud = whereVariable(temp_data);
+						if(jud == -1){
+							cout << "Error , not found this variable : " << temp_data << " in this scope" << endl;
+							exit(1);
+						}
 						if(jud != -1){
 							ss << "\taddi $sp , $sp , " << -(jud*4) << "\n";
 							ss << "\tlw $a"<< a_reg_index << " , 0($sp)\n";
@@ -1232,10 +1256,14 @@ void dealing_Expr(){
 					else if(p_jud == 2){
 						// This is an variable
 						int jud = whereVariable(*k);
+						if(jud == -1){
+							cout << "Error , not found this variable : " << *k << " in this scope" << endl;
+							exit(1);
+						}
 						if(jud != -1){
-							ss << "\taddi $sp , $sp " << -(jud*4) << "\n";
+							ss << "\taddi $sp , $sp ," << -(jud*4) << "\n";
 							ss << "\tlw $a"<< a_reg_index << " , 0($sp)\n";
-							ss << "\taddi $sp , $sp " << (jud*4) << "\n";
+							ss << "\taddi $sp , $sp ," << (jud*4) << "\n";
 							_temp_expr += ss.str(); ss.str("");
 							a_reg_index++;
 						}
@@ -1284,13 +1312,13 @@ void dealing_Expr(){
 					}
 					else if(Op_change_flag == 1){
 						// Pop out the last one 
-						string last_data = Data_stack.back();
-						Data_stack.erase(Data_stack.end());
+						//string last_data = Data_stack.back();
+						//Data_stack.erase(Data_stack.end());
 						// Reverse all stack
 						reverse(Op_stack.begin(),Op_stack.end());
 						reverse(Data_stack.begin(),Data_stack.end());
 						// And then add *i in Op
-						Data_stack.push_back(last_data);
+						//Data_stack.push_back(last_data);
 						Op_stack.push_back(*i);
 						reverse_flag = !reverse_flag;
 						Op_change_flag = 0;
@@ -1345,11 +1373,11 @@ void dealing_Expr(){
 		reverse_flag = !reverse_flag;
 	}
 	// Debug : pop out all Op and Data stack 
-	/*cout << "Pop out Data stack : ";
+	cout << "Pop out Data stack : ";
 	debugVector(Data_stack);
 	cout << "Pop out OP stack : ";
 	debugVector(Op_stack);
-	cout << "And Now , reverse flag = " << reverse_flag << endl;*/
+	cout << "And Now , reverse flag = " << reverse_flag << endl;
 	// After we have Data_stack and Op_stack , we can do it (remember $tx and $ax and $vx , while $ax is using it's own name)
 	string L_reg("$t");
 	L_reg += int2str(t_reg_index); 
@@ -1371,16 +1399,16 @@ void dealing_Expr(){
 					Op_stack.erase(Op_stack.begin());
 				}
 				else if(reverse_flag ==1){
-					/*if(Op_stack.front() == "-" || Op_stack.front() == "/"){
+					if((Op_stack.front() == "-" && Op_stack.size() > 1) || Op_stack.front() == "/"){
 						trans_code2MIPS(Op_stack.front(),data2,data1,L_reg);
 						Op_stack.erase(Op_stack.begin());
 					}
 					else{
 						trans_code2MIPS(Op_stack.front(),data1,data2,L_reg);
 						Op_stack.erase(Op_stack.begin());
-					}*/
-					trans_code2MIPS(Op_stack.front(),data1,data2,L_reg);
-					Op_stack.erase(Op_stack.begin());
+					}
+					//trans_code2MIPS(Op_stack.front(),data1,data2,L_reg);
+					//Op_stack.erase(Op_stack.begin());
 				}
 			Data_stack.insert(Data_stack.begin(),L_reg);
 			}
@@ -1439,13 +1467,13 @@ string dealWithPriority(vector<string> List){
 				int jud = judgeOp(*i,in_top);
 				if(jud == 0 || jud == 3){
 					// Pop out the last one 
-					string last_data = Data.back();
-					Data.erase(Data.end());
+					//string last_data = Data.back();
+					//Data.erase(Data.end());
 					// No need to do anything , push *i ( which 0 declare as don't care)
 					reverse(Op.begin(),Op.end());
 					reverse(Data.begin(),Data.end());
 					// And then add *i in Op
-					Data.push_back(last_data);
+					//Data.push_back(last_data);
 					Op.push_back(*i);
 					reverse_flag = !reverse_flag;
 					Op_flag = 0;
@@ -1486,16 +1514,16 @@ string dealWithPriority(vector<string> List){
 					Op.erase(Op.begin());
 				}
 				else if(reverse_flag ==1){
-					/*if(Op.front() == "-" || Op.front() == "/"){
+					if((Op.front() == "-"  && Op.size() > 1) || Op.front() == "/"){
 						trans_code2MIPS(Op.front(),data2,data1,current_t_reg);
 						Op.erase(Op.begin());
 					}
 					else{
 						trans_code2MIPS(Op.front(),data1,data2,current_t_reg);
 						Op.erase(Op.begin());
-					}*/
-					trans_code2MIPS(Op.front(),data1,data2,current_t_reg);
-					Op.erase(Op.begin());
+					}
+					//trans_code2MIPS(Op.front(),data1,data2,current_t_reg);
+					//Op.erase(Op.begin());
 				}
 				Data.insert(Data.begin(),current_t_reg);
 			}
@@ -1557,7 +1585,7 @@ void trans_var2MIPS(string data , string current_register){
 
 void trans_code2MIPS(string OP,string Data1,string Data2 ,string current_register){
 	// Debug
-	//cout << "OP:" << OP << "; Data1:"<< Data1 << "; Data2:" << Data2 << "; current_register:" << current_register << endl;
+	cout << "OP:" << OP << "; Data1:"<< Data1 << "; Data2:" << Data2 << "; current_register:" << current_register << endl;
 	// And now we can put it into the assembly code
 	// Transfer the Data1 , and Data2 to stack mode
 	int t_usage = 0;
@@ -1787,7 +1815,8 @@ int push_stack(int type , string ID , int size , int ID_type){
 }
 
 int whereVariable(string ID){
-	for(int i = 0; i < stack_header ; i++){
+	// Change 0 to stack_tailer
+	for(int i = stack_tailer; i < stack_header ; i++){
 		if(Variable_List[i] == ID && Variable_List[i].size() > 0)
 			return i;
 	}
