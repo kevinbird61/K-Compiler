@@ -1,4 +1,4 @@
-EXE = run_compile
+EXE = k_compile
 OBJS	= bison.o lex.o main.o
 CC = g++
 CFLAGS = -g -Wall -pedantic -std=c++11
