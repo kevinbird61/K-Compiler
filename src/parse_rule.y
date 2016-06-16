@@ -60,7 +60,7 @@ string *t_reg = new string[10]; // Only for Calculation
 int a_reg_index = 0;
 int t_reg_index = 0;
 int stack_header = 1; // Record the current usage location
-int stack_tailer = 0; // Record the current started location
+int stack_tailer = 1; // Record the current started location
 int stack_global = 1;
 int while_tag = 0;
 int if_tag = 0;
@@ -164,7 +164,7 @@ Program: declList {
 		// Open File for assembly
 		assemFile.open("run_compile.s");
 		// At the end 
-		assemFile << "\t.data\n" << _data << "\t.text\n\t.globl main\n" << _text ;//<< "\n\tli	$v0 , 10\n\tsyscall\n";	
+		assemFile << "\t.data\n" << _data << "\t.text\n\t.globl main\n" << _text << "\n\tli	$v0 , 10\n\tsyscall\n";	
 		/*for(int i = 0 ; i < stack_header ; i++){
 			cout << Variable_List[i] << endl;
 		}*/
@@ -226,7 +226,7 @@ declList_D: type ID decl {
 					ss << *$2 <<":\n";
 					function_list.push_back(*$2);
 					// Require a temp register to store 
-					_text += ss.str() + _temp+ "\tbeq $ra , $zero , main\n\tjr $ra\n"; // For return value and function name declaration
+					_text += ss.str() + _temp+ /*"\tbeq $ra , $zero , main\n*/"\tjr $ra\n"; // For return value and function name declaration
 					ss.str("");
 					_temp = "";
 				}
@@ -470,6 +470,17 @@ stmt: SEMICOLON {
 		else if(judge == 3){
 			// TODO array condition (return one variable in array or entire array)
 		}
+		else if(judge == 5){
+			string a_temp("$a");
+			for(int i = 0;i < a_reg_index ;i++){
+				if(a_reg[i] == *$2){
+					a_temp += int2str(i);
+					break;
+				}
+			}
+			ss << "\tadd $v0, $zero, " << a_temp <<"\n";
+			_temp_expr += ss.str(); ss.str("");
+		}
 		else{
 			// TODO Complex condition - like : return func(a,b) ...
 		}
@@ -531,7 +542,7 @@ stmt: SEMICOLON {
 			int arr_index = 0;
 			array = *$2 + "["+ int2str(arr_index) +"]";
 			// Find it's size 
-			for(int i = 0; i < stack_header ; i++){
+			for(int i = 1; i < stack_header ; i++){
 				if(array == Variable_List[i]){
 					if(Variable_List_type[i] == "INT"){
 						// Print it 
@@ -569,7 +580,7 @@ stmt: SEMICOLON {
 		else if(category == 2){
 			// Variable , lw the memory first into a temp register
 			int index;
-			for(int i = 0 ;i< stack_header ; i++){
+			for(int i = 1 ;i< stack_header ; i++){
 				if(Variable_List[i] == *$2){
 					index = i;
 					break;
@@ -616,7 +627,7 @@ stmt: SEMICOLON {
 			int arr_index = 0;
 			array = *$2 + "["+ int2str(arr_index) +"]";
 			// Find it's size 
-			for(int i = 0; i < stack_header ; i++){
+			for(int i = 1; i < stack_header ; i++){
 				if(array == Variable_List[i]){
 					// Read it 
 					ss << "\t#For read_" << int2str(read_tag) << array << "\n";
@@ -635,7 +646,7 @@ stmt: SEMICOLON {
 		else if(category == 2){
 			// Variable , lw the memory first into a temp register
 			int index;
-			for(int i = 0 ;i< stack_header ; i++){
+			for(int i = 1 ;i< stack_header ; i++){
 				if(Variable_List[i] == *$2){
 					index = i;
 					break;
@@ -683,7 +694,7 @@ expr: unaryOp expr {
 			ss << "\taddi " << temp << ", $zero , 1\n";
 			// add the tag "EndUn" , and then store it back
 			ss << "EndUn"+int2str(un_tag)+":\n";
-			ss << "\tsw "<< temp << ", 0$(sp)\n";
+			ss << "\tsw "<< temp << ", 0($sp)\n";
 			ss << "\taddi $sp , $sp , " << (index*4) << "\n";
 		}
 		else if(judge == 3){
@@ -705,6 +716,7 @@ expr: unaryOp expr {
 		// Release temp register usage
 		t_reg_index--;
 		// And then return the original expr 
+		_temp += ss.str(); ss.str("");
 		un_tag++;
 		*$$ = *$2;
 	}
@@ -844,6 +856,37 @@ void while_toMIPS(size_t while_stmt_loc , int while_stmt_size , string while_exp
 		for_WHILEexpr = make_while_expr(main_op , L_expr , R_expr , 0);
 		// Has been tested , ok
 	}
+	else if(Lexpr.size() >= 1 && Rexpr.size() == 0){
+		// For only one expr 
+		string judgeData = Lexpr.front();
+		int jud = judge_category(judgeData);
+		string temp("$t");
+		temp += int2str(t_reg_index);
+		t_reg_index++;
+		if(jud == 0){
+			// Pure number 
+			ss << "\taddi " << temp << " , $zero , " << judgeData << "\n";
+			ss << "\tbeq " << temp << ", 0 , EndWhile"+int2str(while_tag) << "\n";
+		}
+		else if(jud == 2){
+			// Variable 
+			int index = whereVariable(judgeData);
+			if(index == -1){
+				// Not in this scope
+				cout << "Error variable usage : " << judgeData << "; not in this scope!" << endl;
+				exit(1);
+			}
+			ss << "\taddi $sp , $sp , " << (-index*4) << "\n";
+			ss << "\tlw " << temp << " , " << " 0($sp)\n";
+			ss << "\taddi $sp , $sp , " << (index*4) << "\n";
+			ss << "\tbeq " << temp << ", 0 , EndWhile"+int2str(while_tag) << "\n";
+		}
+		else if(jud == 3){
+			// TODO Array , need to using the following data , combine it and then search
+		}
+		t_reg_index--;
+		for_WHILEexpr = ss.str(); ss.str("");
+	}
 	else{
 		// Extend condition (make here more robust , here now only  a (>= , <= , < , > ) b , Extend to (expr) (> , < , <= , >=) (expr))
 		// Support the while( (Lexpr) Op (Rexpr) )
@@ -910,6 +953,37 @@ void if_else_toMIPS(size_t if_stmt_loc , size_t else_stmt_loc , int if_stmt_size
 		for_IFexpr = make_if_expr(main_op , L_expr , R_expr , 0);
 		// Has been tested , ok
 	}
+	else if(Lexpr.size() >= 1 && Rexpr.size() == 0){
+		// For only one expr 
+		string judgeData = Lexpr.front();
+		int jud = judge_category(judgeData);
+		string temp("$t");
+		temp += int2str(t_reg_index);
+		t_reg_index++;
+		if(jud == 0){
+			// Pure number 
+			ss << "\taddi " << temp << " , $zero , " << judgeData << "\n";
+			ss << "\tbeq " << temp << ", $zero , Else"+int2str(if_tag) << "\n";
+		}
+		else if(jud == 2){
+			// Variable 
+			int index = whereVariable(judgeData);
+			if(index == -1){
+				// Not in this scope
+				cout << "Error variable usage : " << judgeData << "; not in this scope!" << endl;
+				exit(1);
+			}
+			ss << "\taddi $sp , $sp , " << (-index*4) << "\n";
+			ss << "\tlw " << temp << " , " << " 0($sp)\n";
+			ss << "\taddi $sp , $sp , " << (index*4) << "\n";
+			ss << "\tbeq " << temp << ", $zero , Else"+int2str(if_tag) << "\n";
+		}
+		else if(jud == 3){
+			// TODO Array , need to using the following data , combine it and then search
+		}
+		t_reg_index--;
+		for_IFexpr = ss.str(); ss.str("");
+	}
 	else{
 		// Extend condition ( with more than 2 expr on both side)
 		string cur_left_reg = dealWithPriority(Lexpr);
@@ -931,6 +1005,7 @@ void if_else_toMIPS(size_t if_stmt_loc , size_t else_stmt_loc , int if_stmt_size
 string make_while_expr(string OP , string data1, string data2 , int data_type){
 	// Transfer data1 and data2 to register mode
 	string Lreg , Rreg;
+	int t_usage = 0;
 	if(data_type == 0){
 		if(judge_category(data1) == 2){
 			// Varaible , (contain array with [])
@@ -942,6 +1017,7 @@ string make_while_expr(string OP , string data1, string data2 , int data_type){
 			string temp_r("$t");
 			temp_r += int2str(t_reg_index);
 			t_reg_index++;
+			t_usage++;
 			ss << "\taddi $sp , $sp , " << -(index*4) << "\n";
 			ss << "\tlw " << temp_r << ", 0($sp)\n";
 			ss << "\taddi $sp , $sp , " << (index*4) << "\n";
@@ -952,6 +1028,7 @@ string make_while_expr(string OP , string data1, string data2 , int data_type){
 			string temp_r("$t");
 			temp_r += int2str(t_reg_index);
 			t_reg_index++;
+			t_usage++;
 			ss << "\taddi " << temp_r << ", $zero , " << data1 << "\n";
 			Lreg = temp_r;
 		}
@@ -972,6 +1049,7 @@ string make_while_expr(string OP , string data1, string data2 , int data_type){
 			string temp_r("$t");
 			temp_r += int2str(t_reg_index);
 			t_reg_index++;
+			t_usage++;
 			ss << "\taddi $sp , $sp , " << -(index*4) << "\n";
 			ss << "\tlw " << temp_r << ", 0($sp)\n";
 			ss << "\taddi $sp , $sp , " << (index*4) << "\n";
@@ -982,11 +1060,18 @@ string make_while_expr(string OP , string data1, string data2 , int data_type){
 			string temp_r("$t");
 			temp_r += int2str(t_reg_index);
 			t_reg_index++;
+			t_usage++;
 			ss << "\taddi " << temp_r << ", $zero , " << data2 << "\n";
 			Rreg = temp_r;
 		}
 		else if(judge_category(data2) == 5){
-			// TODO a_reg
+			// TODO , if expr is a_reg
+			for(int i = 0; i < a_reg_index ; i++){
+				if(a_reg[i] == data2){
+					Rreg = "$a"+int2str(i);
+					break;
+				}
+			}
 		}
 		else{
 			// TODO extend mode
@@ -1001,6 +1086,7 @@ string make_while_expr(string OP , string data1, string data2 , int data_type){
 	string temp_j("$t");
 	temp_j += int2str(t_reg_index);
 	t_reg_index++;
+	t_usage++;
 	// Now we have Lreg and Rreg
 	if(OP == "<"){
 		ss << "\tslt " << temp_j << ", " << Lreg << ", " << Rreg << "\n"; // Origin: Lreg < Rreg , if yes , temp_j = 1 ,else temp_j = 0
@@ -1045,7 +1131,7 @@ string make_while_expr(string OP , string data1, string data2 , int data_type){
 	}
 	
 	// Release the temp register
-	t_reg_index -= 3;
+	t_reg_index -= t_usage;
 	// store ss
 	string result = ss.str(); 
 	ss.str("");
@@ -1055,6 +1141,7 @@ string make_while_expr(string OP , string data1, string data2 , int data_type){
 string make_if_expr(string OP , string data1, string data2 , int data_type){
 	// Transfer data1 and data2 to register mode
 	string Lreg , Rreg;
+	int t_usage = 0;
 	if(data_type == 0){
 		if(judge_category(data1) == 2){
 			// Varaible , (contain array with [])
@@ -1066,6 +1153,7 @@ string make_if_expr(string OP , string data1, string data2 , int data_type){
 			string temp_r("$t");
 			temp_r += int2str(t_reg_index);
 			t_reg_index++;
+			t_usage++;
 			ss << "\taddi $sp , $sp , " << -(index*4) << "\n";
 			ss << "\tlw " << temp_r << ", 0($sp)\n";
 			ss << "\taddi $sp , $sp , " << (index*4) << "\n";
@@ -1076,11 +1164,18 @@ string make_if_expr(string OP , string data1, string data2 , int data_type){
 			string temp_r("$t");
 			temp_r += int2str(t_reg_index);
 			t_reg_index++;
+			t_usage++;
 			ss << "\taddi " << temp_r << ", $zero , " << data1 << "\n";
 			Lreg = temp_r;
 		}
 		else if(judge_category(data1) == 5){
 			// TODO a_reg
+			for(int i = 0; i < a_reg_index ; i++){
+				if(a_reg[i] == data1){
+					Lreg = "$a"+int2str(i);
+					break;
+				}
+			}
 		}
 		else{
 			// TODO extend mode
@@ -1096,6 +1191,7 @@ string make_if_expr(string OP , string data1, string data2 , int data_type){
 			string temp_r("$t");
 			temp_r += int2str(t_reg_index);
 			t_reg_index++;
+			t_usage++;
 			ss << "\taddi $sp , $sp , " << -(index*4) << "\n";
 			ss << "\tlw " << temp_r << ", 0($sp)\n";
 			ss << "\taddi $sp , $sp , " << (index*4) << "\n";
@@ -1106,11 +1202,18 @@ string make_if_expr(string OP , string data1, string data2 , int data_type){
 			string temp_r("$t");
 			temp_r += int2str(t_reg_index);
 			t_reg_index++;
+			t_usage++;
 			ss << "\taddi " << temp_r << ", $zero , " << data2 << "\n";
 			Rreg = temp_r;
 		}
 		else if(judge_category(data2) == 5){
 			// TODO , if expr is a_reg
+			for(int i = 0; i < a_reg_index ; i++){
+				if(a_reg[i] == data2){
+					Rreg = "$a"+int2str(i);
+					break;
+				}
+			}
 		}
 		else{
 			// TODO extend mode (expr with another expr condition)
@@ -1124,6 +1227,7 @@ string make_if_expr(string OP , string data1, string data2 , int data_type){
 	string temp_j("$t");
 	temp_j += int2str(t_reg_index);
 	t_reg_index++;
+	t_usage++;
 	// Now we have Lreg and Rreg
 	if(OP == "<"){
 		ss << "\tslt " << temp_j << ", " << Lreg << ", " << Rreg << "\n"; // Origin: Lreg < Rreg , if yes , temp_j = 1 ,else temp_j = 0
@@ -1168,7 +1272,7 @@ string make_if_expr(string OP , string data1, string data2 , int data_type){
 	}
 	
 	// Release the temp register
-	t_reg_index -= 3;
+	t_reg_index -= t_usage;
 	// store ss
 	string result = ss.str(); 
 	ss.str("");
@@ -1219,8 +1323,19 @@ void dealing_Expr(){
 			//cout << "+++++ Found in Variable_List (Var): " << Lvalue_list[0] << endl;
 		}
 		else{
-			cout << "Error with lvalue , which not existed: " << Lvalue_list[0] << endl;
-			exit(1);
+			// Search whether it is in the a_reg
+			for(int i = 0 ; i < a_reg_index ; i++){
+				if(a_reg[i] == Lvalue_list[0]){
+					// Find it , change flag to 3 (A_reg mode)
+					flag = 3;
+					store_index = i;
+					break;
+				}
+			}
+			if(flag == 0){
+				cout << "Error with lvalue , which not existed: " << Lvalue_list[0] << endl;
+				exit(1);
+			}
 		}
 	}
 	
@@ -1379,6 +1494,7 @@ void dealing_Expr(){
 			else{
 				// Not found , exit	
 				cout << "Error Right Value: " << *i << endl;
+				debugVector(function_list);
 				exit(1);
 			}
 		}
@@ -1432,25 +1548,64 @@ void dealing_Expr(){
 		}
 		else if(Data_stack.size()==1){
 			data1 = Data_stack.front();
-			Data_stack.erase(Data_stack.begin());
 			if(!Op_stack.empty() && (Data_stack.front() != L_reg)){
 				ss << "\t#With Data1:"<<data1<<", Op:"<<Op_stack.front()<<"\n";
 				trans_code2MIPS(Op_stack.front(),data1,L_reg,L_reg);
 			}
 			else if(Op_stack.size()==0 && (Data_stack.front())!= L_reg){
 				// Do the add directly (Like $v0)
-				ss << "\t#With Data1:"<<data1<<",which no Op\n";
-				ss << "\tadd " << L_reg << ", "<< L_reg << ", " << data1 << "\n";
-				_temp_expr += ss.str(); ss.str("");
+				if(judge_category(Data_stack.front()) == 2){
+					int index = whereVariable(Data_stack.front());
+					if(index == -1){
+						cout << "Error with scope problem : " << Data_stack.front() << ", not in this scope!" << endl; 
+					}
+					string temp_reg("$t");
+					temp_reg += int2str(t_reg_index); 
+					ss << "\t#With Data1:"<<data1<<",which no Op\n";
+					ss << "\taddi $sp , $sp , " << -index*4 << "\n";
+					ss << "\tlw " << temp_reg << ", 0($sp)\n";
+					ss << "\taddi $sp , $sp , " << index*4 << "\n"; 
+					ss << "\tadd " << L_reg << ", "<< L_reg << ", " << temp_reg << "\n";
+					_temp_expr += ss.str(); ss.str("");
+				}
+				else if(judge_category(Data_stack.front()) == 0){
+					ss << "\t#With Data1:"<<data1<<",which no Op\n";
+					ss << "\tadd " << L_reg << ", "<< L_reg << ", " << data1 << "\n";
+					_temp_expr += ss.str(); ss.str("");	
+				}
+				else if(judge_category(Data_stack.front()) == 5){
+					// I'm a_reg , find it 
+					for(int i = 0 ; i < a_reg_index ; i++){
+						if(a_reg[i] == data1)
+							data1 = "$a"+ int2str(i);
+					}
+					ss << "\t#With argument assignment:" << data1 << ",which no OP\n";
+					ss << "\tadd " << L_reg << ", " << L_reg << ", " << data1 << "\n";
+					_temp_expr += ss.str(); ss.str("");	
+				}
+				else if(data1 == "$v0"){
+					// Return value 
+					ss << "\t#With return value :" << data1 << ",which no OP\n";
+					ss << "\tadd " << L_reg << ", " << L_reg << ", " << data1 << "\n";
+					_temp_expr += ss.str(); ss.str("");	
+				}
 			}
+			Data_stack.erase(Data_stack.begin());
 		}
 	}
 	//cout << "~~~~~~~~~~~~~~~~~~~~~~~~~~~~store index = " << store_index << endl;
-	// Assign the L_reg to the Lvalue storage location
-	ss << "\taddi $sp , $sp ," << -(store_index*4)<< "\n";
-	ss << "\tsw " << L_reg << ", 0($sp)\n";
-	ss << "\taddi $sp , $sp ," << (store_index*4)<< "\n";
-	_temp_expr += ss.str(); ss.str("");
+	if(flag == 1 || flag == 2){
+		// Assign the L_reg to the Lvalue storage location
+		ss << "\taddi $sp , $sp ," << -(store_index*4)<< "\n";
+		ss << "\tsw " << L_reg << ", 0($sp)\n";
+		ss << "\taddi $sp , $sp ," << (store_index*4)<< "\n";
+		_temp_expr += ss.str(); ss.str("");
+	}
+	else if(flag == 3){
+		// Left value is a_reg 
+		ss << "\tadd " << "$a"+int2str(store_index) << ", $zero , " << L_reg << "\n";
+		_temp_expr += ss.str(); ss.str("");
+	}
 	// At Least , clean out the vector
 	if(t_reg_index != 0)
 		t_reg_index--;
