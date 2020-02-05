@@ -7,6 +7,8 @@ int yyerror();
 %}
 
 /* For Definition */
+%option yylineno
+
 DIGIT [1-9]*[0-9]+
 identifier [i][d][A-Z][a-z]*
 %%

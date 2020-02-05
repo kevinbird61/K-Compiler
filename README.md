@@ -57,8 +57,8 @@ Testing the run_compile.s in MIPS.
   - `lex <filename>.lex` : get lex.yy.c .
   - `gcc lex.yy.c -lfl ` + (optional)`-o <output executable file>` : If you don't give the output file name, execute file will be `a.out` .
  - When you want to build K-compiler , using the command:
-  - `make` : to make the execute file - `run_compile`
-  - `./k_compile path/to/testfile` : translate the test.c to MIPS (run_compile.s)
+  - `make` : to generate the executable file (need to run under `src/`)
+  - `./k_compile path/to/testfile` : translate the test.c to MIPS (`k_compile` will output a file named `run_compile.s`)
     - Here , you can replace your file with test.c , to make your assembly code.
 
 # Some Supplement
